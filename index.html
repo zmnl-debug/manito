@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>마니또 뽑기</title>
-<meta name="description" content="서버 없이 동작하는 마니또 뽑기 웹앱. 결과는 각자의 PIN으로만 확인할 수 있어요.">
+<meta name="description" content="서버 없이 동작하는 마니또 뽑기 웹앱. 결과는 각자의 비밀번호로만 확인할 수 있어요.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -149,7 +149,7 @@ h3 { font-size: 1rem; margin-top: 16px; }
     <header class="hero">
       <div class="hero-badge">M</div>
       <h1>마니또 뽑기</h1>
-      <p class="intro">우리끼리 몰래 마니또 정하기.<br>서버에 아무것도 저장되지 않고, 결과는 각자의 PIN으로만 열어봐요.</p>
+      <p class="intro">우리끼리 몰래 마니또 정하기.<br>서버에 아무것도 저장되지 않고, 결과는 각자의 비밀번호로만 열어봐요.</p>
     </header>
 
     <div class="card">
@@ -176,9 +176,9 @@ h3 { font-size: 1rem; margin-top: 16px; }
     <footer class="steps">
       <b>이용 방법</b><br>
       ① 방장이 방을 만들고 링크 공유<br>
-      ② 참가자가 이름·PIN으로 등록 후 등록 코드를 방장에게 전송<br>
+      ② 참가자가 이름·비밀번호로 등록 후 등록 코드를 방장에게 전송<br>
       ③ 방장이 매칭하고 각 참가자에게 개인 링크 전송<br>
-      ④ 각자 PIN으로 자기 마니또 확인!
+      ④ 각자 비밀번호로 자기 마니또 확인!
     </footer>
   </section>
 
@@ -199,17 +199,17 @@ h3 { font-size: 1rem; margin-top: 16px; }
       <form id="form-join" novalidate>
         <label for="join-name">이름</label>
         <input id="join-name" maxlength="20" placeholder="예: 김철수" autocomplete="off">
-        <label for="join-pin">PIN (숫자 6자리 이상)</label>
+        <label for="join-pin">비밀번호 (숫자 6자리 이상)</label>
         <input id="join-pin" type="password" inputmode="numeric" placeholder="결과 확인에 꼭 필요해요" autocomplete="off">
-        <label for="join-pin2">PIN 확인</label>
-        <input id="join-pin2" type="password" inputmode="numeric" placeholder="같은 PIN을 한 번 더 입력" autocomplete="off">
+        <label for="join-pin2">비밀번호 확인</label>
+        <input id="join-pin2" type="password" inputmode="numeric" placeholder="같은 비밀번호를 한 번 더 입력" autocomplete="off">
         <p id="join-error" class="error" hidden></p>
         <button type="submit" class="btn" id="btn-join">등록하고 코드 받기</button>
       </form>
 
       <div id="join-result" hidden>
         <h2>등록 완료!</h2>
-        <p class="hint warn-text">PIN은 결과 확인에 꼭 필요해요. 잊어버리면 다시 볼 수 없어요.</p>
+        <p class="hint warn-text">비밀번호는 결과 확인에 꼭 필요해요. 잊어버리면 다시 볼 수 없어요.</p>
         <p class="hint">아래 등록 코드를 복사해 방장에게 개인톡으로 보내 주세요.</p>
         <textarea id="join-code" class="code-box" rows="5" readonly></textarea>
         <button id="btn-copy-code" class="btn btn-secondary" type="button">등록 코드 복사</button>
@@ -263,8 +263,8 @@ MANITO1-..."></textarea>
 
     <div class="card">
       <form id="form-open" novalidate>
-        <label for="open-pin">내 PIN</label>
-        <input id="open-pin" type="password" inputmode="numeric" placeholder="등록 때 만든 PIN" autocomplete="off">
+        <label for="open-pin">내 비밀번호</label>
+        <input id="open-pin" type="password" inputmode="numeric" placeholder="등록 때 만든 비밀번호" autocomplete="off">
         <p id="open-error" class="error" hidden></p>
         <button type="submit" class="btn" id="btn-open">마니또 확인하기</button>
       </form>
@@ -282,12 +282,12 @@ MANITO1-..."></textarea>
         </div>
       </div>
 
-      <p class="hint" style="margin-top:14px">PIN이 맞지 않으면 결과를 볼 수 없어요. 방장도 당신의 PIN을 모릅니다.</p>
+      <p class="hint" style="margin-top:14px">비밀번호가 맞지 않으면 결과를 볼 수 없어요. 방장도 당신의 비밀번호를 모릅니다.</p>
     </div>
 
     <footer class="steps">
       <b>이용 방법</b><br>
-      방장에게 받은 개인 링크에서 PIN을 입력하면,<br>
+      방장에게 받은 개인 링크에서 비밀번호를 입력하면,<br>
       등록 때 정한 마니또가 카드 뒤에 숨어 있어요.
     </footer>
   </section>
@@ -486,7 +486,7 @@ function validateName(name) {
 function validatePin(pin) {
   // 4자리는 대입 공격에 약하므로 숫자 6자리 이상으로 강제한다
   const p = String(pin || '');
-  if (!/^\d{6,}$/.test(p)) throw new ManitoError('WEAK_PIN', 'PIN은 숫자 6자리 이상으로 입력해 주세요.');
+  if (!/^\d{6,}$/.test(p)) throw new ManitoError('WEAK_PIN', '비밀번호는 숫자 6자리 이상으로 입력해 주세요.');
   return p;
 }
 
@@ -685,7 +685,7 @@ async function openPersonalLink(payload, pin) {
   assertCrypto();
   const p = parsePersonalLinkPayload(payload);
   const pinNum = String(pin || '');
-  if (!/^\d{6,}$/.test(pinNum)) throw new ManitoError('WRONG_PIN', 'PIN이 맞지 않아요.');
+  if (!/^\d{6,}$/.test(pinNum)) throw new ManitoError('WRONG_PIN', '비밀번호가 맞지 않아요.');
   let privateKey;
   try {
     // PIN → PBKDF2 → 개인키 복호화
@@ -701,7 +701,7 @@ async function openPersonalLink(payload, pin) {
     );
   } catch (e) {
     // PIN이 틀리면 개인키 복호화(AES-GCM 인증)가 실패한다
-    throw new ManitoError('WRONG_PIN', 'PIN이 맞지 않아요.');
+    throw new ManitoError('WRONG_PIN', '비밀번호가 맞지 않아요.');
   }
   // 개인키 × 일회용 공개키 → ECDH → 마니또 이름 복호화
   const aesKey = await deriveSharedAesKey(privateKey, p.ok);
@@ -884,7 +884,7 @@ if (typeof document !== 'undefined' && document.getElementById('screen-home')) {
     btn.textContent = '등록 중...';
     try {
       if ($('join-pin').value !== $('join-pin2').value) {
-        throw new ManitoError('PIN_MISMATCH', 'PIN이 서로 달라요. 같은 PIN을 입력해 주세요.');
+        throw new ManitoError('PIN_MISMATCH', '비밀번호가 서로 달라요. 같은 비밀번호를 입력해 주세요.');
       }
       const result = await createRegistrationCode(state.room, $('join-name').value, $('join-pin').value);
       $('join-code').value = result.code;
@@ -1024,7 +1024,7 @@ if (typeof document !== 'undefined' && document.getElementById('screen-home')) {
       });
     } catch (err) {
       showError('open-error', err.code === 'WRONG_PIN'
-        ? 'PIN이 맞지 않아요. 다시 확인해 주세요.'
+        ? '비밀번호가 맞지 않아요. 다시 확인해 주세요.'
         : '결과를 여는 데 문제가 있어요. 링크를 다시 확인해 주세요.');
     } finally {
       btn.disabled = false;
