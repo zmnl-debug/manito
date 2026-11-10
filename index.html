@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>마니또 뽑기</title>
+<meta name="description" content="서버 없이 동작하는 마니또 뽑기 웹앱. 결과는 각자의 PIN으로만 확인할 수 있어요.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; }
+:root {
+  --bg: #FFF6ED; --card: #FFFFFF; --ink: #40301F; --muted: #9A8271;
+  --accent: #C9563C; --accent-dark: #A83B24; --gold: #E5B15C;
+  --line: #F1E3D3; --field: #FFFBF5; --error: #B3261E; --soft: #FBEEDD;
+}
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: 'Noto Sans KR', system-ui, -apple-system, sans-serif;
+  line-height: 1.6; font-size: 16px;
+}
+.wrap { max-width: 480px; margin: 0 auto; padding: 24px 16px 56px; }
+.hero { text-align: center; padding: 18px 0 8px; }
+.hero-badge {
+  width: 72px; height: 72px; margin: 0 auto 12px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 30% 25%, #E2704F, #C9563C 60%, #A83B24);
+  color: #FFF3E0; font-size: 30px; font-weight: 900;
+  box-shadow: 0 6px 18px rgba(201, 86, 60, .35);
+  border: 3px solid var(--gold);
+}
+h1 { font-size: 1.6rem; font-weight: 900; letter-spacing: -.02em; }
+.intro { color: var(--muted); font-size: .95rem; margin-top: 6px; }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+  padding: 20px 18px; margin-top: 14px;
+  box-shadow: 0 4px 20px rgba(120, 72, 30, .07);
+}
+label { display: block; font-size: .88rem; font-weight: 700; margin: 14px 0 6px; }
+label:first-child { margin-top: 0; }
+.req { color: var(--accent-dark); font-size: .75rem; margin-left: 4px; }
+.opt { color: var(--muted); font-size: .75rem; font-weight: 500; margin-left: 4px; }
+input, textarea {
+  width: 100%; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px;
+  font: inherit; color: var(--ink); background: var(--field);
+}
+input:focus, textarea:focus {
+  outline: none; border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(229, 177, 92, .25);
+}
+.btn {
+  display: block; width: 100%; margin-top: 16px; padding: 13px 18px;
+  border: 0; border-radius: 999px; background: var(--accent); color: #fff;
+  font: inherit; font-weight: 700; cursor: pointer; text-align: center; text-decoration: none;
+  transition: transform .08s ease;
+}
+.btn:active { transform: scale(.98); }
+.btn:disabled { background: #D8C7B8; cursor: wait; }
+.btn-secondary { background: #FFF; color: var(--accent-dark); border: 1.5px solid var(--accent); }
+.btn-ghost { background: var(--soft); color: var(--ink); }
+.error { color: var(--error); font-size: .85rem; font-weight: 600; margin-top: 10px; }
+.hint { color: var(--muted); font-size: .84rem; }
+.warn-text { color: var(--accent-dark); font-weight: 700; }
+.code-box {
+  width: 100%; margin-top: 10px; padding: 12px; border-radius: 12px;
+  border: 1.5px dashed var(--gold); background: var(--soft); color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .78rem; line-height: 1.5; word-break: break-all; resize: vertical;
+}
+.steps {
+  margin-top: 26px; padding: 14px 16px; border-radius: 14px;
+  background: var(--soft); color: var(--muted); font-size: .8rem; line-height: 1.8;
+}
+.room-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.room-head h1 { font-size: 1.35rem; }
+.dday-badge {
+  display: inline-block; padding: 3px 12px; border-radius: 999px;
+  background: var(--accent); color: #fff; font-weight: 900; font-size: .85rem; white-space: nowrap;
+}
+.tabs { display: flex; gap: 8px; margin-top: 16px; }
+.tab {
+  flex: 1; padding: 11px; border-radius: 12px; border: 1.5px solid var(--line);
+  background: #FFF; color: var(--muted); font: inherit; font-weight: 700; cursor: pointer;
+}
+.tab.active { background: var(--accent); border-color: var(--accent); color: #FFF; }
+h2 { font-size: 1.15rem; margin-bottom: 4px; }
+h3 { font-size: 1rem; margin-top: 16px; }
+.reject-item { color: var(--error); font-size: .8rem; margin-top: 8px; word-break: break-all; }
+.match-notice {
+  margin-top: 12px; padding: 12px 14px; border-radius: 12px;
+  background: var(--soft); border: 1.5px solid var(--gold);
+  color: var(--accent-dark); font-size: .85rem; font-weight: 600;
+}
+.name-list { font-weight: 700; word-break: break-all; }
+.link-row { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.link-row .btn { margin-top: 8px; }
+.info-list { margin-top: 12px; }
+.info-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 0; border-bottom: 1px dashed var(--line);
+}
+.info-row:last-child { border-bottom: 0; }
+.info-row dt { color: var(--muted); font-size: .88rem; font-weight: 600; }
+.info-row dd { font-weight: 700; }
+.center-card { text-align: center; }
+.warn-card { border: 1.5px solid var(--error); color: var(--error); font-size: .9rem; }
+.flip-scene { margin-top: 18px; perspective: 900px; }
+.flip-card {
+  position: relative; height: 200px; border-radius: 18px;
+  transform-style: preserve-3d; transition: transform .65s cubic-bezier(.2, .7, .3, 1);
+  cursor: pointer;
+}
+.flip-card.flipped { transform: rotateY(180deg); }
+.flip-face {
+  position: absolute; inset: 0;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  border-radius: 18px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px;
+  padding: 18px; text-align: center;
+}
+.flip-front {
+  background: linear-gradient(145deg, #C9563C, #A83B24); color: #FFF3E0;
+  box-shadow: 0 8px 22px rgba(168, 59, 36, .35);
+}
+.flip-front .q-mark { font-size: 56px; font-weight: 900; line-height: 1; }
+.flip-front p { font-size: .85rem; opacity: .85; }
+.flip-back {
+  background: #FFF; border: 2px solid var(--gold);
+  transform: rotateY(180deg);
+  box-shadow: 0 8px 22px rgba(120, 72, 30, .18);
+}
+.reveal-label { color: var(--muted); font-size: .9rem; }
+.reveal-name { font-size: 1.7rem; font-weight: 900; color: var(--accent-dark); word-break: break-all; }
+@media (min-width: 420px) { h1 { font-size: 1.8rem; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="crypto-warning" class="card warn-card" hidden>
+    이 브라우저에서는 보안 기능(Web Crypto)을 사용할 수 없어요.<br>
+    주소가 https:// 로 시작하는지 확인하거나, 최신 버전의 크롬·사파리·삼성 브라우저로 열어 주세요.
+  </div>
+
+  <!-- 화면 1: 첫 화면 (방 만들기) -->
+  <section id="screen-home" class="screen">
+    <header class="hero">
+      <div class="hero-badge">M</div>
+      <h1>마니또 뽑기</h1>
+      <p class="intro">우리끼리 몰래 마니또 정하기.<br>서버에 아무것도 저장되지 않고, 결과는 각자의 PIN으로만 열어봐요.</p>
+    </header>
+
+    <div class="card">
+      <form id="form-create" novalidate>
+        <label for="create-group">그룹 이름 <span class="req">필수</span></label>
+        <input id="create-group" maxlength="30" placeholder="예: 우리 반 연말 파티" autocomplete="off">
+        <label for="create-date">마니또 공개일 <span class="req">필수</span></label>
+        <input id="create-date" type="date" required>
+        <label for="create-budget">선물 예산 <span class="opt">선택 — 비우면 숨겨요</span></label>
+        <input id="create-budget" maxlength="20" placeholder="예: 1만원 이하" autocomplete="off">
+        <p id="create-error" class="error" hidden></p>
+        <button type="submit" class="btn">방 만들기</button>
+      </form>
+    </div>
+
+    <div id="room-link-box" class="card" hidden>
+      <h2>방 링크가 만들어졌어요!</h2>
+      <p class="hint">이 링크를 단톡방에 공유하세요. 링크를 연 사람부터 참가 등록을 할 수 있어요.</p>
+      <textarea id="room-link-text" class="code-box" rows="3" readonly></textarea>
+      <button id="btn-copy-room" class="btn btn-secondary" type="button">방 링크 복사</button>
+      <a id="btn-open-room" class="btn btn-ghost" href="./">방 화면 열기 →</a>
+    </div>
+
+    <footer class="steps">
+      <b>이용 방법</b><br>
+      ① 방장이 방을 만들고 링크 공유<br>
+      ② 참가자가 이름·PIN으로 등록 후 등록 코드를 방장에게 전송<br>
+      ③ 방장이 매칭하고 각 참가자에게 개인 링크 전송<br>
+      ④ 각자 PIN으로 자기 마니또 확인!
+    </footer>
+  </section>
+
+  <!-- 화면 2: 방 화면 (#r=) -->
+  <section id="screen-room" class="screen" hidden>
+    <header class="room-head">
+      <h1 id="room-title"></h1>
+      <span id="room-dday" class="dday-badge"></span>
+    </header>
+    <p id="room-sub" class="hint"></p>
+
+    <nav class="tabs">
+      <button id="tab-join" class="tab active" type="button">참가 등록</button>
+      <button id="tab-host" class="tab" type="button">방장 모드</button>
+    </nav>
+
+    <div id="panel-join" class="card">
+      <form id="form-join" novalidate>
+        <label for="join-name">이름</label>
+        <input id="join-name" maxlength="20" placeholder="예: 김철수" autocomplete="off">
+        <label for="join-pin">PIN (숫자 6자리 이상)</label>
+        <input id="join-pin" type="password" inputmode="numeric" placeholder="결과 확인에 꼭 필요해요" autocomplete="off">
+        <label for="join-pin2">PIN 확인</label>
+        <input id="join-pin2" type="password" inputmode="numeric" placeholder="같은 PIN을 한 번 더 입력" autocomplete="off">
+        <p id="join-error" class="error" hidden></p>
+        <button type="submit" class="btn" id="btn-join">등록하고 코드 받기</button>
+      </form>
+
+      <div id="join-result" hidden>
+        <h2>등록 완료!</h2>
+        <p class="hint warn-text">PIN은 결과 확인에 꼭 필요해요. 잊어버리면 다시 볼 수 없어요.</p>
+        <p class="hint">아래 등록 코드를 복사해 방장에게 개인톡으로 보내 주세요.</p>
+        <textarea id="join-code" class="code-box" rows="5" readonly></textarea>
+        <button id="btn-copy-code" class="btn btn-secondary" type="button">등록 코드 복사</button>
+      </div>
+    </div>
+
+    <div id="panel-host" class="card" hidden>
+      <h2>방장 모드</h2>
+      <p class="hint">받은 등록 코드를 모두 붙여넣으세요. (여러 개 한 번에 가능, 줄바꿈 구분)</p>
+      <textarea id="host-codes" rows="6" placeholder="MANITO1-...
+MANITO1-..."></textarea>
+      <p id="host-error" class="error" hidden></p>
+      <button id="btn-validate" class="btn" type="button">등록 코드 확인</button>
+
+      <div id="host-check" hidden>
+        <h3>등록 인원 (<span id="host-count">0</span>명)</h3>
+        <p id="host-names" class="name-list"></p>
+        <div id="host-rejected"></div>
+        <p id="host-dup" class="error" hidden></p>
+        <button id="btn-match" class="btn" type="button">매칭하기</button>
+        <p class="hint">매칭 결과는 화면에 절대 표시되지 않아요. 아래 개인 링크를 각 참가자에게 보내 주세요.</p>
+      </div>
+
+      <div id="host-links" hidden>
+        <h3>개인 링크 배포</h3>
+        <p id="match-notice" class="match-notice" hidden>매칭이 끝났어요. 이 링크들만 보내 주세요. 다시 매칭하면 이전 링크는 모두 버리고 새 링크를 전원에게 다시 보내야 해요.</p>
+        <div id="host-link-list"></div>
+        <button id="btn-rematch" class="btn btn-secondary" type="button" hidden>다시 매칭하기</button>
+      </div>
+    </div>
+
+    <footer class="steps">
+      <b>이용 방법</b><br>
+      참가자는 [참가 등록]에서 등록 코드를 만들어 방장에게 보내고,<br>
+      방장은 [방장 모드]에서 코드를 모아 매칭하면 끝!
+    </footer>
+  </section>
+
+  <!-- 화면 3: 결과 확인 (#m=) -->
+  <section id="screen-result" class="screen" hidden>
+    <div class="card">
+      <p class="hint">마니또 결과 확인</p>
+      <h1 id="result-title"></h1>
+      <dl class="info-list">
+        <div class="info-row"><dt>마니또 공개일</dt><dd id="result-date"></dd></div>
+        <div class="info-row"><dt>D-day</dt><dd><span id="result-dday" class="dday-badge"></span></dd></div>
+        <div class="info-row" id="result-budget-row" hidden><dt>선물 예산</dt><dd id="result-budget"></dd></div>
+      </dl>
+      <p id="result-past" class="warn-text" hidden>마니또 공개일이 지났어요</p>
+    </div>
+
+    <div class="card">
+      <form id="form-open" novalidate>
+        <label for="open-pin">내 PIN</label>
+        <input id="open-pin" type="password" inputmode="numeric" placeholder="등록 때 만든 PIN" autocomplete="off">
+        <p id="open-error" class="error" hidden></p>
+        <button type="submit" class="btn" id="btn-open">마니또 확인하기</button>
+      </form>
+
+      <div id="reveal" class="flip-scene" hidden>
+        <div id="flip-card" class="flip-card">
+          <div class="flip-face flip-front">
+            <span class="q-mark">?</span>
+            <p>카드를 눌러 뒤집어 보세요</p>
+          </div>
+          <div class="flip-face flip-back">
+            <p class="reveal-label">당신의 마니또는</p>
+            <p id="reveal-name" class="reveal-name"></p>
+          </div>
+        </div>
+      </div>
+
+      <p class="hint" style="margin-top:14px">PIN이 맞지 않으면 결과를 볼 수 없어요. 방장도 당신의 PIN을 모릅니다.</p>
+    </div>
+
+    <footer class="steps">
+      <b>이용 방법</b><br>
+      방장에게 받은 개인 링크에서 PIN을 입력하면,<br>
+      등록 때 정한 마니또가 카드 뒤에 숨어 있어요.
+    </footer>
+  </section>
+
+  <!-- 잘못된 링크 -->
+  <section id="screen-broken" class="screen" hidden>
+    <div class="card center-card">
+      <h1>링크가 올바르지 않아요</h1>
+      <p class="hint" style="margin-top:8px">링크가 잘렸거나 잘못 복사된 것 같아요.<br>방장이나 참가자에게 링크를 다시 요청해 주세요.</p>
+      <a class="btn" href="./">첫 화면으로 가기</a>
+    </div>
+  </section>
+</div>
+<script>
+'use strict';
+/* ============================================================
+ * [코어] DOM과 무관한 핵심 로직 — 브라우저 UI와 Node 테스트가 공용 사용
+ * ============================================================ */
+const PBKDF2_ITERATIONS = 600000;
+const B64URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+const CODE_PREFIX = 'MANITO1-';
+const HKDF_INFO = 'manito-result-v1';
+const MIN_PARTICIPANTS = 3;
+
+class ManitoError extends Error {
+  constructor(code, message) {
+    super(message || code);
+    this.name = 'ManitoError';
+    this.code = code;
+  }
+}
+
+function assertCrypto() {
+  if (typeof crypto === 'undefined' || !crypto ||
+      typeof crypto.getRandomValues !== 'function' ||
+      typeof crypto.subtle === 'undefined' || !crypto.subtle) {
+    throw new ManitoError('NO_CRYPTO', '이 환경에서는 보안 기능(Web Crypto)을 사용할 수 없어요.');
+  }
+}
+
+function hasCrypto() {
+  try { assertCrypto(); return true; } catch (e) { return false; }
+}
+
+/* ---------- 페이로드 인코딩: JSON → UTF-8 → base64url ---------- */
+function bytesToB64url(bytes) {
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i];
+    const has1 = i + 1 < bytes.length;
+    const has2 = i + 2 < bytes.length;
+    const b1 = has1 ? bytes[i + 1] : 0;
+    const b2 = has2 ? bytes[i + 2] : 0;
+    out += B64URL_ALPHABET[b0 >> 2];
+    out += B64URL_ALPHABET[((b0 & 3) << 4) | (b1 >> 4)];
+    if (has1) out += B64URL_ALPHABET[((b1 & 15) << 2) | (b2 >> 6)];
+    if (has2) out += B64URL_ALPHABET[b2 & 63];
+  }
+  return out;
+}
+
+function b64urlToBytes(str) {
+  const clean = String(str).replace(/[\s=]/g, '');
+  const bytes = [];
+  let buffer = 0;
+  let bits = 0;
+  for (const ch of clean) {
+    const idx = B64URL_ALPHABET.indexOf(ch);
+    if (idx < 0) throw new ManitoError('BAD_ENCODING', '페이로드를 해석할 수 없어요.');
+    buffer = (buffer << 6) | idx;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((buffer >> bits) & 255);
+    }
+  }
+  return new Uint8Array(bytes);
+}
+
+function encodePayload(obj) {
+  return bytesToB64url(new TextEncoder().encode(JSON.stringify(obj)));
+}
+
+function decodePayload(str) {
+  let json;
+  try {
+    json = new TextDecoder().decode(b64urlToBytes(str));
+  } catch (e) {
+    if (e && e.name === 'ManitoError') throw e;
+    throw new ManitoError('BAD_ENCODING', '페이로드를 해석할 수 없어요.');
+  }
+  try {
+    return JSON.parse(json);
+  } catch (e) {
+    throw new ManitoError('BAD_ENCODING', '페이로드를 해석할 수 없어요.');
+  }
+}
+
+/* ---------- 랜덤 (crypto.getRandomValues 기반) ---------- */
+function randomBytes(n) {
+  assertCrypto();
+  const b = new Uint8Array(n);
+  crypto.getRandomValues(b);
+  return b;
+}
+
+function randomInt(maxExclusive) {
+  // 편향 제거: 균등 분할 상한을 넘는 값은 다시 뽑는다
+  if (maxExclusive < 2 || maxExclusive > 0x100000000) throw new RangeError('randomInt 범위 오류');
+  const limit = Math.floor(0x100000000 / maxExclusive) * maxExclusive;
+  const buf = new Uint32Array(1);
+  do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
+  return buf[0] % maxExclusive;
+}
+
+function secureShuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  }
+  return arr;
+}
+
+/* ---------- 날짜 / D-day ---------- */
+function todayISO(now) {
+  const d = now ? new Date(now) : new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+function isValidISODate(s) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const y = +s.slice(0, 4), m = +s.slice(5, 7), d = +s.slice(8, 10);
+  if (m < 1 || m > 12) return false;
+  const last = new Date(y, m, 0).getDate();
+  return d >= 1 && d <= last;
+}
+
+function calcDday(dateStr, now) {
+  // 시간은 빼고 날짜끼리만 비교 (보는 사람 기기의 현지 날짜 기준)
+  if (!isValidISODate(dateStr)) return null;
+  const target = Date.UTC(+dateStr.slice(0, 4), +dateStr.slice(5, 7) - 1, +dateStr.slice(8, 10));
+  const ref = now ? new Date(now) : new Date();
+  const today = Date.UTC(ref.getFullYear(), ref.getMonth(), ref.getDate());
+  const diff = Math.round((target - today) / 86400000);
+  if (diff === 0) return 'D-DAY';
+  return diff > 0 ? 'D-' + diff : 'D+' + (-diff);
+}
+
+/* ---------- 방 ---------- */
+function createRoom(groupName, dateStr, budget) {
+  const g = String(groupName || '').trim();
+  const d = String(dateStr || '').trim();
+  const b = String(budget || '').trim();
+  if (!g) throw new ManitoError('NO_GROUP', '그룹 이름을 입력해 주세요.');
+  if (!d || !isValidISODate(d)) throw new ManitoError('NO_DATE', '공개일을 선택해 주세요.');
+  if (d < todayISO()) throw new ManitoError('PAST_DATE', '공개일은 오늘 이후 날짜로 선택해 주세요.');
+  if (b.length > 20) throw new ManitoError('BAD_BUDGET', '예산은 20자 이내로 입력해 주세요.');
+  const room = { v: 1, id: bytesToB64url(randomBytes(6)), g: g, d: d };
+  if (b) room.b = b; // 예산을 비우면 필드 자체를 넣지 않는다
+  return room;
+}
+
+function roomLink(room) {
+  return '#r=' + encodePayload(room);
+}
+
+function parseRoomPayload(payloadStr) {
+  const room = decodePayload(payloadStr);
+  if (!room || room.v !== 1 || typeof room.id !== 'string' || !room.id ||
+      typeof room.g !== 'string' || !room.g ||
+      typeof room.d !== 'string' || !isValidISODate(room.d)) {
+    throw new ManitoError('BAD_ROOM', '방 정보가 올바르지 않아요.');
+  }
+  if (room.b !== undefined && (typeof room.b !== 'string' || !room.b.trim())) {
+    throw new ManitoError('BAD_ROOM', '방 정보가 올바르지 않아요.');
+  }
+  return room;
+}
+
+function parseLocationHash(hash) {
+  const h = String(hash || '');
+  if (h.startsWith('#r=')) return { type: 'room', payload: h.slice(3) };
+  if (h.startsWith('#m=')) return { type: 'result', payload: h.slice(3) };
+  return { type: 'home', payload: null };
+}
+/* ---------- 등록 (참가자 브라우저) ---------- */
+function validateName(name) {
+  const n = String(name || '').trim();
+  if (!n) throw new ManitoError('NO_NAME', '이름을 입력해 주세요.');
+  if (n.length > 20) throw new ManitoError('LONG_NAME', '이름은 20자 이내로 입력해 주세요.');
+  return n;
+}
+
+function validatePin(pin) {
+  // 4자리는 대입 공격에 약하므로 숫자 6자리 이상으로 강제한다
+  const p = String(pin || '');
+  if (!/^\d{6,}$/.test(p)) throw new ManitoError('WEAK_PIN', 'PIN은 숫자 6자리 이상으로 입력해 주세요.');
+  return p;
+}
+
+async function derivePinKey(pin, salt) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    base,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function exportPublicJwk(publicKey) {
+  const jwk = await crypto.subtle.exportKey('jwk', publicKey);
+  return { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y };
+}
+
+function importEcdhPublicJwk(jwk) {
+  if (!jwk || jwk.kty !== 'EC' || jwk.crv !== 'P-256' || !jwk.x || !jwk.y) {
+    throw new ManitoError('BAD_KEY', '공개키가 올바르지 않아요.');
+  }
+  return crypto.subtle.importKey('jwk', jwk, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+}
+
+async function createRegistrationCode(room, name, pin) {
+  assertCrypto();
+  const n = validateName(name);
+  const p = validatePin(pin);
+  if (!room || room.v !== 1 || typeof room.id !== 'string' || !room.id) {
+    throw new ManitoError('BAD_ROOM', '방 정보가 올바르지 않아요.');
+  }
+  const keyPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const privJwk = await crypto.subtle.exportKey('jwk', keyPair.privateKey);
+  delete privJwk.key_ops; // 가져올 환경마다 다른 key_ops 제약을 피하기 위해 제거
+  delete privJwk.ext;
+  const salt = randomBytes(16);
+  const iv = randomBytes(12);
+  const pinKey = await derivePinKey(p, salt);
+  const wrapped = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv },
+    pinKey,
+    new TextEncoder().encode(JSON.stringify(privJwk))
+  );
+  const entry = {
+    v: 1,
+    r: room.id,
+    n: n,
+    pk: await exportPublicJwk(keyPair.publicKey),
+    ek: bytesToB64url(new Uint8Array(wrapped)),
+    s: bytesToB64url(salt),
+    i: bytesToB64url(iv),
+  };
+  return { entry: entry, code: CODE_PREFIX + encodePayload(entry) };
+}
+
+/* ---------- 매칭 (방장 브라우저) ---------- */
+function snippetOf(token) {
+  const t = String(token);
+  return t.length <= 24 ? t : t.slice(0, 18) + '...' + t.slice(-4);
+}
+
+function parseRegistrationCodes(text, roomId) {
+  const entries = [];
+  const rejected = [];
+  const seenCodes = new Set();
+  const tokens = String(text || '').split(/[\s,;]+/).map(function (t) { return t.trim(); }).filter(Boolean);
+  for (const token of tokens) {
+    const snippet = snippetOf(token);
+    if (seenCodes.has(token)) {
+      // 완전히 같은 코드를 두 번 붙인 경우: 하나만 남기고 표시로 알려준다
+      rejected.push({ snippet: snippet, reason: 'DUPLICATE_CODE' });
+      continue;
+    }
+    seenCodes.add(token);
+    if (!token.startsWith(CODE_PREFIX)) {
+      rejected.push({ snippet: snippet, reason: 'FORMAT' });
+      continue;
+    }
+    let entry;
+    try {
+      entry = decodePayload(token.slice(CODE_PREFIX.length));
+    } catch (e) {
+      rejected.push({ snippet: snippet, reason: 'BROKEN' });
+      continue;
+    }
+    if (!entry || entry.v !== 1 || typeof entry.r !== 'string' ||
+        typeof entry.n !== 'string' || !entry.n || !entry.pk || !entry.ek || !entry.s || !entry.i) {
+      rejected.push({ snippet: snippet, reason: 'BROKEN' });
+      continue;
+    }
+    if (entry.r !== roomId) {
+      rejected.push({ snippet: snippet, reason: 'OTHER_ROOM', name: entry.n });
+      continue;
+    }
+    entries.push(entry);
+  }
+  const nameCount = new Map();
+  for (const e of entries) nameCount.set(e.n, (nameCount.get(e.n) || 0) + 1);
+  const duplicates = [];
+  for (const pair of nameCount) if (pair[1] > 1) duplicates.push(pair[0]);
+  return { entries: entries, rejected: rejected, duplicates: duplicates };
+}
+
+function assignManitos(names) {
+  const list = Array.from(names);
+  if (new Set(list).size !== list.length) {
+    throw new ManitoError('DUPLICATE_NAME', '같은 이름이 두 번 등록되었어요.');
+  }
+  if (list.length < 2) throw new ManitoError('TOO_FEW', '참가자가 너무 적어요.');
+  const shuffled = secureShuffle(list);
+  // 원형으로 한 칸씩 밀어 짝 짓기: i번째 → i+1번째, 마지막 → 첫 번째
+  const pairs = shuffled.map(function (person, i) {
+    return { person: person, manito: shuffled[(i + 1) % shuffled.length] };
+  });
+  // 구조적으로 자기 배정/중복이 없지만, 링크 생성 전 코드에서 한 번 더 검증
+  const seen = new Set();
+  for (const p of pairs) {
+    if (p.person === p.manito) throw new ManitoError('SELF_MATCH', '자기 자신에게 배정되었어요.');
+    if (seen.has(p.manito)) throw new ManitoError('DUP_MATCH', '중복 배정되었어요.');
+    seen.add(p.manito);
+  }
+  return pairs;
+}
+
+async function deriveSharedAesKey(privateKey, peerPublicJwk) {
+  // ECDH 공유키 → HKDF(SHA-256) → AES-GCM 키
+  const peer = await importEcdhPublicJwk(peerPublicJwk);
+  const sharedBits = await crypto.subtle.deriveBits({ name: 'ECDH', public: peer }, privateKey, 256);
+  const hkdfBase = await crypto.subtle.importKey('raw', sharedBits, 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(0), info: new TextEncoder().encode(HKDF_INFO) },
+    hkdfBase,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function createPersonalLinks(room, entries) {
+  assertCrypto();
+  if (!room || room.v !== 1 || typeof room.id !== 'string' || !room.id) {
+    throw new ManitoError('BAD_ROOM', '방 정보가 올바르지 않아요.');
+  }
+  if (!entries || entries.length < MIN_PARTICIPANTS) {
+    throw new ManitoError('TOO_FEW', '매칭에는 최소 ' + MIN_PARTICIPANTS + '명이 필요해요.');
+  }
+  const pairs = assignManitos(entries.map(function (e) { return e.n; }));
+  const byName = new Map(entries.map(function (e) { return [e.n, e]; }));
+  const links = [];
+  for (const pair of pairs) {
+    const entry = byName.get(pair.person);
+    // 일회용 ECDH 키 쌍: 공유키를 만든 뒤 개인키와 평문 결과는 버린다
+    const oneTime = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+    const aesKey = await deriveSharedAesKey(oneTime.privateKey, entry.pk);
+    const iv = randomBytes(12);
+    const cipher = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: iv },
+      aesKey,
+      new TextEncoder().encode(pair.manito)
+    );
+    const payload = {
+      v: 1,
+      r: room.id,
+      g: room.g,
+      d: room.d,
+      n: entry.n,
+      ek: entry.ek,
+      s: entry.s,
+      i: entry.i,
+      ok: await exportPublicJwk(oneTime.publicKey),
+      c: bytesToB64url(new Uint8Array(cipher)),
+      w: bytesToB64url(iv),
+    };
+    if (room.b) payload.b = room.b; // 예산이 있을 때만 포함
+    links.push({ n: entry.n, manito: pair.manito, url: '#m=' + encodePayload(payload) });
+  }
+  return links;
+}
+
+function parsePersonalLinkPayload(payloadStr) {
+  const p = (payloadStr && typeof payloadStr === 'object') ? payloadStr : decodePayload(payloadStr);
+  const required = ['v', 'r', 'g', 'd', 'n', 'ek', 's', 'i', 'ok', 'c', 'w'];
+  for (const k of required) {
+    if (!p || p[k] === undefined || p[k] === null || p[k] === '') {
+      throw new ManitoError('BAD_LINK', '개인 링크가 올바르지 않아요.');
+    }
+  }
+  if (p.v !== 1) throw new ManitoError('BAD_LINK', '개인 링크가 올바르지 않아요.');
+  return p;
+}
+
+/* ---------- 결과 확인 (참가자 브라우저) ---------- */
+async function openPersonalLink(payload, pin) {
+  assertCrypto();
+  const p = parsePersonalLinkPayload(payload);
+  const pinNum = String(pin || '');
+  if (!/^\d{6,}$/.test(pinNum)) throw new ManitoError('WRONG_PIN', 'PIN이 맞지 않아요.');
+  let privateKey;
+  try {
+    // PIN → PBKDF2 → 개인키 복호화
+    const pinKey = await derivePinKey(pinNum, b64urlToBytes(p.s));
+    const privJson = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: b64urlToBytes(p.i) },
+      pinKey,
+      b64urlToBytes(p.ek)
+    );
+    const privJwk = JSON.parse(new TextDecoder().decode(privJson));
+    privateKey = await crypto.subtle.importKey(
+      'jwk', privJwk, { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']
+    );
+  } catch (e) {
+    // PIN이 틀리면 개인키 복호화(AES-GCM 인증)가 실패한다
+    throw new ManitoError('WRONG_PIN', 'PIN이 맞지 않아요.');
+  }
+  // 개인키 × 일회용 공개키 → ECDH → 마니또 이름 복호화
+  const aesKey = await deriveSharedAesKey(privateKey, p.ok);
+  const plain = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: b64urlToBytes(p.w) },
+    aesKey,
+    b64urlToBytes(p.c)
+  );
+  return new TextDecoder().decode(plain);
+}
+
+const ManitoCore = {
+  ManitoError: ManitoError,
+  bytesToB64url: bytesToB64url, b64urlToBytes: b64urlToBytes,
+  encodePayload: encodePayload, decodePayload: decodePayload,
+  randomBytes: randomBytes, randomInt: randomInt, secureShuffle: secureShuffle,
+  assignManitos: assignManitos,
+  todayISO: todayISO, isValidISODate: isValidISODate, calcDday: calcDday,
+  validateName: validateName, validatePin: validatePin,
+  createRoom: createRoom, roomLink: roomLink,
+  parseRoomPayload: parseRoomPayload, parseLocationHash: parseLocationHash,
+  createRegistrationCode: createRegistrationCode,
+  parseRegistrationCodes: parseRegistrationCodes,
+  createPersonalLinks: createPersonalLinks,
+  parsePersonalLinkPayload: parsePersonalLinkPayload,
+  openPersonalLink: openPersonalLink,
+  hasCrypto: hasCrypto,
+};
+if (typeof globalThis !== 'undefined') globalThis.ManitoCore = ManitoCore;
+/* ============================================================
+ * [UI] 브라우저 전용 코드 — DOM이 있을 때만 실행 (Node 테스트에서는 건너뜀)
+ * ============================================================ */
+if (typeof document !== 'undefined' && document.getElementById('screen-home')) {
+  const $ = function (id) { return document.getElementById(id); };
+  const state = { room: null, check: null, resultPayload: null, createdUrl: '' };
+
+  const REJECT_LABEL = {
+    FORMAT: '등록 코드 형식이 아니에요',
+    BROKEN: '손상되었거나 불완전한 코드예요',
+    OTHER_ROOM: '다른 방의 코드예요',
+    DUPLICATE_CODE: '같은 코드를 두 번 붙여넣었어요',
+  };
+
+  function showError(id, message) {
+    const el = $(id);
+    if (message) { el.textContent = message; el.hidden = false; }
+    else { el.hidden = true; el.textContent = ''; }
+  }
+
+  function showScreen(name) {
+    for (const s of ['home', 'room', 'result', 'broken']) {
+      $('screen-' + s).hidden = s !== name;
+    }
+  }
+
+  /* ----- 복사: 클립보드 API 실패 시 텍스트를 선택 상태로 대체 ----- */
+  async function copyText(text, button, boxEl) {
+    const original = button.textContent;
+    const flash = function (msg) {
+      button.textContent = msg;
+      setTimeout(function () { button.textContent = original; }, 2400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return flash('복사됐어요!');
+      } catch (e) { /* 아래 대체 방식으로 진행 */ }
+    }
+    if (boxEl) {
+      boxEl.focus();
+      boxEl.select();
+      try {
+        document.execCommand('copy');
+        return flash('복사됐어요!');
+      } catch (e) { /* 선택 상태 유지 */ }
+      return flash('텍스트를 선택했어요 — 길게 눌러 복사해 주세요');
+    }
+    flash('복사에 실패했어요. 텍스트를 직접 선택해 주세요');
+  }
+
+  function fullUrl(hash) {
+    return location.origin + location.pathname + location.search + hash;
+  }
+
+  function renderDday(el, dateStr) {
+    const d = calcDday(dateStr);
+    el.textContent = d || '';
+    return d;
+  }
+
+  function dateMinToday() { $('create-date').min = todayISO(); }
+
+  /* ----- 라우팅 ----- */
+  function route() {
+    const parsed = parseLocationHash(location.hash);
+    if (parsed.type === 'home') return showHome();
+    try {
+      if (parsed.type === 'room') return enterRoom(parseRoomPayload(parsed.payload));
+      if (parsed.type === 'result') return enterResult(parsed.payload);
+    } catch (e) {
+      return showBroken();
+    }
+  }
+
+  function showBroken() { showScreen('broken'); }
+
+  function showHome() {
+    showScreen('home');
+    dateMinToday();
+  }
+
+  function enterRoom(room) {
+    state.room = room;
+    state.check = null;
+    showScreen('room');
+    $('room-title').textContent = room.g;
+    renderDday($('room-dday'), room.d);
+    $('room-sub').textContent = '마니또 공개일: ' + room.d + (room.b ? ' · 선물 예산: ' + room.b : '');
+    $('form-join').hidden = false;
+    $('join-result').hidden = true;
+    $('host-check').hidden = true;
+    $('host-links').hidden = true;
+    $('btn-match').hidden = false;
+    $('match-notice').hidden = true;
+    $('btn-rematch').hidden = true;
+    $('host-codes').value = '';
+    switchTab('join');
+  }
+
+  function enterResult(payloadStr) {
+    const p = parsePersonalLinkPayload(payloadStr);
+    state.resultPayload = p;
+    showScreen('result');
+    $('result-title').textContent = p.n + '님의 마니또 확인';
+    $('result-date').textContent = p.d;
+    const d = renderDday($('result-dday'), p.d);
+    $('result-past').hidden = !(d && d.charAt(1) === '+');
+    if (p.b) {
+      $('result-budget-row').hidden = false;
+      $('result-budget').textContent = p.b;
+    } else {
+      $('result-budget-row').hidden = true;
+    }
+    $('form-open').hidden = false;
+    showError('open-error', null);
+    $('open-pin').value = '';
+    $('reveal').hidden = true;
+    $('flip-card').classList.remove('flipped');
+    $('reveal-name').textContent = '';
+  }
+
+  /* ----- 방 만들기 ----- */
+  $('form-create').addEventListener('submit', function (e) {
+    e.preventDefault();
+    showError('create-error', null);
+    let room;
+    try {
+      room = createRoom($('create-group').value, $('create-date').value, $('create-budget').value);
+    } catch (err) {
+      showError('create-error', err.message);
+      return;
+    }
+    state.createdUrl = fullUrl(roomLink(room));
+    $('room-link-text').value = state.createdUrl;
+    $('btn-open-room').href = roomLink(room);
+    $('room-link-box').hidden = false;
+    $('room-link-box').scrollIntoView({ behavior: 'smooth' });
+  });
+
+  $('btn-copy-room').addEventListener('click', function () {
+    copyText(state.createdUrl, $('btn-copy-room'), $('room-link-text'));
+  });
+
+  /* ----- 참가 등록 ----- */
+  $('form-join').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    showError('join-error', null);
+    const btn = $('btn-join');
+    btn.disabled = true;
+    btn.textContent = '등록 중...';
+    try {
+      if ($('join-pin').value !== $('join-pin2').value) {
+        throw new ManitoError('PIN_MISMATCH', 'PIN이 서로 달라요. 같은 PIN을 입력해 주세요.');
+      }
+      const result = await createRegistrationCode(state.room, $('join-name').value, $('join-pin').value);
+      $('join-code').value = result.code;
+      $('form-join').hidden = true;
+      $('join-result').hidden = false;
+    } catch (err) {
+      showError('join-error', err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '등록하고 코드 받기';
+    }
+  });
+
+  $('btn-copy-code').addEventListener('click', function () {
+    copyText($('join-code').value, $('btn-copy-code'), $('join-code'));
+  });
+
+  /* ----- 탭 ----- */
+  function switchTab(tab) {
+    const join = tab === 'join';
+    $('tab-join').classList.toggle('active', join);
+    $('tab-host').classList.toggle('active', !join);
+    $('panel-join').hidden = !join;
+    $('panel-host').hidden = join;
+  }
+  $('tab-join').addEventListener('click', function () { switchTab('join'); });
+  $('tab-host').addEventListener('click', function () { switchTab('host'); });
+
+  /* ----- 방장 모드 ----- */
+  $('btn-validate').addEventListener('click', function () {
+    showError('host-error', null);
+    // 다시 검증하면 이전 매칭 결과(링크)는 모두 숨긴다
+    $('host-links').hidden = true;
+    $('match-notice').hidden = true;
+    $('btn-rematch').hidden = true;
+    $('btn-match').hidden = false;
+    const roomId = state.room ? state.room.id : null;
+    const check = parseRegistrationCodes($('host-codes').value, roomId);
+    state.check = check;
+    $('host-count').textContent = String(check.entries.length);
+    $('host-names').textContent = check.entries.length
+      ? check.entries.map(function (e) { return e.n; }).join(', ')
+      : '확인된 등록 코드가 없어요.';
+    const rejBox = $('host-rejected');
+    rejBox.innerHTML = '';
+    for (const r of check.rejected) {
+      const p = document.createElement('p');
+      p.className = 'reject-item';
+      p.textContent = '제외됨 · ' + REJECT_LABEL[r.reason] +
+        (r.reason === 'OTHER_ROOM' && r.name ? ' (' + r.name + '님 코드)' : '') +
+        ' — ' + r.snippet;
+      rejBox.appendChild(p);
+    }
+    rejBox.hidden = check.rejected.length === 0;
+    if (check.duplicates.length) {
+      showError('host-dup', '같은 이름이 두 번 이상 등록되었어요: ' + check.duplicates.join(', '));
+    } else {
+      showError('host-dup', null);
+    }
+    $('btn-match').disabled = check.entries.length < MIN_PARTICIPANTS || check.duplicates.length > 0;
+    $('host-check').hidden = false;
+  });
+
+  function renderMatchLinks(links) {
+    const list = $('host-link-list');
+    list.innerHTML = '';
+    for (const link of links) {
+      const row = document.createElement('div');
+      row.className = 'link-row';
+      const box = document.createElement('textarea');
+      box.className = 'code-box';
+      box.readOnly = true;
+      box.rows = 2;
+      box.value = fullUrl(link.url);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn btn-secondary';
+      b.textContent = link.n + '님에게 보낼 링크 복사';
+      b.addEventListener('click', function () { copyText(box.value, b, box); });
+      row.appendChild(b);
+      row.appendChild(box);
+      list.appendChild(row);
+    }
+    // 매칭 성공 후에는 '매칭하기'를 숨겨 실수로 다시 누르지 않게 한다
+    $('btn-match').hidden = true;
+    $('match-notice').hidden = false;
+    $('btn-rematch').hidden = false;
+    $('host-links').hidden = false;
+  }
+
+  async function runMatching() {
+    showError('host-error', null);
+    if (!state.check || state.check.entries.length < MIN_PARTICIPANTS) return;
+    const btn = $('btn-match');
+    btn.disabled = true;
+    btn.textContent = '매칭 중...';
+    try {
+      const links = await createPersonalLinks(state.room, state.check.entries);
+      renderMatchLinks(links);
+    } catch (err) {
+      showError('host-error', err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '매칭하기';
+    }
+  }
+
+  $('btn-match').addEventListener('click', function () { runMatching(); });
+
+  $('btn-rematch').addEventListener('click', function () {
+    const confirmed = confirm(
+      '다시 매칭하시겠어요?\n\n' +
+      '매칭이 끝났어요. 이 링크들만 보내 주세요. 다시 매칭하면 이전 링크는 모두 버리고 새 링크를 전원에게 다시 보내야 해요.'
+    );
+    if (confirmed) runMatching();
+  });
+
+  $('host-codes').addEventListener('input', function () {
+    // 등록 코드 입력란을 수정하면 이전 링크 목록은 숨긴다
+    $('host-links').hidden = true;
+  });
+
+  /* ----- 결과 확인 ----- */
+  $('form-open').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    showError('open-error', null);
+    const btn = $('btn-open');
+    btn.disabled = true;
+    btn.textContent = '확인 중...';
+    try {
+      const manito = await openPersonalLink(state.resultPayload, $('open-pin').value);
+      $('reveal-name').textContent = manito;
+      $('form-open').hidden = true;
+      $('reveal').hidden = false;
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { $('flip-card').classList.add('flipped'); });
+      });
+    } catch (err) {
+      showError('open-error', err.code === 'WRONG_PIN'
+        ? 'PIN이 맞지 않아요. 다시 확인해 주세요.'
+        : '결과를 여는 데 문제가 있어요. 링크를 다시 확인해 주세요.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '마니또 확인하기';
+    }
+  });
+
+  $('flip-card').addEventListener('click', function () {
+    $('flip-card').classList.toggle('flipped');
+  });
+
+  /* ----- 시작 ----- */
+  if (!hasCrypto()) {
+    $('crypto-warning').hidden = false;
+    const submits = document.querySelectorAll('form button[type="submit"]');
+    for (const b of submits) b.disabled = true;
+  }
+  dateMinToday();
+  window.addEventListener('hashchange', route);
+  route();
+}
+</script>
+</body>
+</html>
