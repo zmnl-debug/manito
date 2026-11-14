@@ -98,7 +98,7 @@ section('테스트 2. 등록 - 매칭 - 확인 전 과정 시뮬레이션 (4명)
   // (1) 참가 등록: 각자 브라우저에서 등록 코드 생성
   const codes = [];
   for (const person of people) {
-    const { code } = await Core.createRegistrationCode(room, person.name, person.pin);
+    const { code } = await Core.createRegistrationCode(room, person.name, person.pin, 2);
     codes.push(code);
   }
   check('등록 코드 4개가 MANITO2- 접두어로 생성됨', codes.every(c => c.startsWith('MANITO2-')));
@@ -140,7 +140,7 @@ section('테스트 3. 틀린 PIN 복호화 차단');
   const pins = { '김철수': '314159', '이영희': '222222', '박민수': '333333' };
   const codes = [];
   for (const [name, pin] of Object.entries(pins)) {
-    codes.push((await Core.createRegistrationCode(room, name, pin)).code);
+    codes.push((await Core.createRegistrationCode(room, name, pin, 2)).code);
   }
   const parsed = Core.parseRegistrationCodes(codes.join('\n'), room.id);
   const links = await Core.createPersonalLinks(room, parsed.entries);
@@ -200,7 +200,7 @@ section('테스트 5. 예산 입력 방 / 미입력 방 표시·숨김 데이터
   const mkLinks = async (room) => {
     const codes = [];
     for (const n of ['가', '나', '다']) {
-      codes.push((await Core.createRegistrationCode(room, n, '123456')).code);
+      codes.push((await Core.createRegistrationCode(room, n, '123456', 2)).code);
     }
     const entries = Core.parseRegistrationCodes(codes.join('\n'), room.id).entries;
     return Core.createPersonalLinks(room, entries);
@@ -250,7 +250,7 @@ section('테스트 7. 한글, 공백 포함, 이모지 이름 처리');
   ];
   const codes = [];
   for (const p of people) {
-    codes.push((await Core.createRegistrationCode(room, p.name, p.pin)).code);
+    codes.push((await Core.createRegistrationCode(room, p.name, p.pin, 2)).code);
   }
   check('한글/공백/이모지 이름으로 등록 코드 생성 성공',
     codes.every(c => c.startsWith('MANITO2-')));
@@ -282,7 +282,7 @@ section('테스트 8. 같은 등록 코드 중복 붙여넣기 처리');
   for (const [name, pin] of [
     ['김철수', '111111'], ['이영희', '222222'], ['박민수', '333333'], ['최지우', '444444'],
   ]) {
-    codes.push((await Core.createRegistrationCode(room, name, pin)).code);
+    codes.push((await Core.createRegistrationCode(room, name, pin, 2)).code);
   }
 
   // 같은 코드(문자열이 완전히 같음)를 두 번 포함해 붙여넣는 경우
@@ -301,7 +301,7 @@ section('테스트 8. 같은 등록 코드 중복 붙여넣기 처리');
   check('중복 코드가 제거된 4명으로 매칭 정상 진행', links.length === 4);
 
   // 이름만 같고 코드가 다른 경우는 지금처럼 매칭을 막는다
-  const otherCodeSameName = (await Core.createRegistrationCode(room, '김철수', '999999')).code;
+  const otherCodeSameName = (await Core.createRegistrationCode(room, '김철수', '999999', 2)).code;
   const parsed2 = Core.parseRegistrationCodes(
     [codes[0], otherCodeSameName, codes[1], codes[2]].join('\n'), room.id);
   check('이름만 같고 코드가 다른 경우는 여전히 중복 이름으로 감지됨',
@@ -329,13 +329,13 @@ section('추가 검증. PIN 규칙, 깨진 링크, 최소 인원');
   const room2 = { v: 1, id: 'testroom', g: '2명 방', d: dateAfter(7) };
   const two = [];
   for (const n of ['가', '나']) {
-    two.push((await Core.createRegistrationCode(room2, n, '123456')).entry);
+    two.push((await Core.createRegistrationCode(room2, n, '123456', 2)).entry);
   }
   let tooFew2 = false;
   try { await Core.createPersonalLinks(room2, two); } catch (e) { tooFew2 = e.code === 'TOO_FEW'; }
   check('2명 매칭은 최소 인원 미달로 차단', tooFew2);
   const room = Core.createRoom('최소 인원 방', dateAfter(7), '');
-  const one = (await Core.createRegistrationCode(room, '가', '123456')).code;
+  const one = (await Core.createRegistrationCode(room, '가', '123456', 2)).code;
   const entries = Core.parseRegistrationCodes(one, room.id).entries;
   let tooFew = false;
   try { await Core.createPersonalLinks(room, entries); } catch (e) { tooFew = e.code === 'TOO_FEW'; }
@@ -356,7 +356,7 @@ section('테스트 9. v2 전 과정 시뮬레이션 (4명)');
   ];
   const codes = [];
   for (const person of people) {
-    codes.push((await Core.createRegistrationCode(room, person.name, person.pin)).code);
+    codes.push((await Core.createRegistrationCode(room, person.name, person.pin, 2)).code);
   }
   check('v2: 등록 코드 4개가 MANITO2- 접두어로 생성됨', codes.every(c => c.startsWith('MANITO2-')));
   const parsed = Core.parseRegistrationCodes(codes.join('\n'), room.id);
@@ -386,7 +386,7 @@ section('테스트 9. v2 전 과정 시뮬레이션 (4명)');
   }
   check('v2: 틀린 비밀번호는 복호화 차단 (WRONG_PIN)', blocked);
   const otherRoom = Core.createRoom('다른 v2 방', dateAfter(7), '');
-  const otherCode = (await Core.createRegistrationCode(otherRoom, '외부인', '777777')).code;
+  const otherCode = (await Core.createRegistrationCode(otherRoom, '외부인', '777777', 2)).code;
   const mixed = Core.parseRegistrationCodes([codes[0], otherCode].join('\n'), room.id);
   check('v2: 다른 방 코드는 OTHER_ROOM으로 제외됨',
     mixed.entries.length === 1 &&
@@ -404,7 +404,7 @@ section('테스트 10. v2 링크·코드 길이');
   const roomHash = Core.roomLink(room).slice(3);
   const codes = [];
   for (const n of people) {
-    codes.push((await Core.createRegistrationCode(room, n, '123456')).code);
+    codes.push((await Core.createRegistrationCode(room, n, '123456', 2)).code);
   }
   const entries = Core.parseRegistrationCodes(codes.join('\n'), room.id).entries;
   const links = await Core.createPersonalLinks(room, entries);
@@ -447,8 +447,8 @@ section('테스트 11. v1 하위 호환');
     if (revealed !== link.manito) v1Ok = false;
   }
   check('v1 전 과정(등록-매칭-복호화) 그대로 동작', v1Ok);
-  const v2FromV1Room = (await Core.createRegistrationCode(v1Room, '최지우', '444444')).code;
-  check('v1 방 링크로 등록해도 새 코드는 v2', v2FromV1Room.startsWith('MANITO2-'));
+  const v3FromV1Room = (await Core.createRegistrationCode(v1Room, '최지우', '444444')).code;
+  check('v1 방 링크로 등록해도 새 코드는 v3', v3FromV1Room.startsWith('MANITO3-'));
 }
 
 /* ------------------------------------------------------------------ */
@@ -461,8 +461,8 @@ section('테스트 12. v1/v2 혼합 매칭');
   const codes = [
     (await Core.createRegistrationCode(room, '김철수', pins['김철수'], 1)).code,
     (await Core.createRegistrationCode(room, '이영희', pins['이영희'], 1)).code,
-    (await Core.createRegistrationCode(room, '박민수', pins['박민수'])).code,
-    (await Core.createRegistrationCode(room, '최지우', pins['최지우'])).code,
+    (await Core.createRegistrationCode(room, '박민수', pins['박민수'], 2)).code,
+    (await Core.createRegistrationCode(room, '최지우', pins['최지우'], 2)).code,
   ];
   const parsed = Core.parseRegistrationCodes(codes.join('\n'), room.id);
   check('혼합: v1 코드 2개 + v2 코드 2개 모두 수락',
@@ -499,7 +499,7 @@ section('테스트 13. 잘린 v2 링크는 파싱 단계에서 깨진 링크 처
   const room = Core.createRoom('잘림 방', dateAfter(7), '');
   const codes = [];
   for (const n of ['가', '나', '다']) {
-    codes.push((await Core.createRegistrationCode(room, n, '123456')).code);
+    codes.push((await Core.createRegistrationCode(room, n, '123456', 2)).code);
   }
   const entries = Core.parseRegistrationCodes(codes.join('\n'), room.id).entries;
   const links = await Core.createPersonalLinks(room, entries);
@@ -525,6 +525,287 @@ section('테스트 13. 잘린 v2 링크는 파싱 단계에서 깨진 링크 처
     cutCodeFail = r.entries.length === 0 && r.rejected.length === 1 && r.rejected[0].reason === 'BROKEN';
   } catch (e) { cutCodeFail = false; }
   check('잘린 v2 등록 코드는 BROKEN으로 제외', cutCodeFail);
+}
+
+/* ------------------------------------------------------------------ */
+/* 테스트 14. v3 P-256 BigInt 곡선 연산                                  */
+/* ------------------------------------------------------------------ */
+section('테스트 14. v3 P-256 BigInt 곡선 연산');
+{
+  const toBig = (b) => Core.bytesToBigInt(b);
+  let curveOk = true;
+  let compOk = true;
+  for (let i = 0; i < 20; i++) {
+    const kp = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+    const jwk = await crypto.subtle.exportKey('jwk', kp.privateKey);
+    const raw = new Uint8Array(await crypto.subtle.exportKey('raw', kp.publicKey));
+    const d = toBig(Core.b64urlToBytes(jwk.d));
+    const x = toBig(Core.b64urlToBytes(jwk.x));
+    const y = toBig(Core.b64urlToBytes(jwk.y));
+    const [cx, cy] = Core.p256ScalarMult(d);
+    if (cx !== x || cy !== y) curveOk = false;
+    const comp = Core.compressPoint(cx, cy);
+    const back = Core.decompressPoint(comp);
+    if (back.length !== 65 || back[0] !== 0x04 ||
+        toBig(back.subarray(1, 33)) !== cx || toBig(back.subarray(33, 65)) !== cy) compOk = false;
+    const compFromRaw = Core.compressRawPoint(raw);
+    if (compFromRaw.length !== 33) compOk = false;
+    for (let j = 0; j < 33; j++) if (compFromRaw[j] !== comp[j]) compOk = false;
+  }
+  check('JS로 계산한 d·G가 Web Crypto가 export한 JWK x,y와 일치 (20키)', curveOk);
+  check('압축→복원이 원래 점과 일치, raw 압축과도 동일 (20키)', compOk);
+  const bigX = new Uint8Array(33);
+  bigX[0] = 0x02;
+  for (let i = 1; i < 33; i++) bigX[i] = 255; // x ≥ p
+  let badX = false;
+  try { Core.decompressPoint(bigX); } catch (e) { badX = e.code === 'BAD_KEY'; }
+  check('x ≥ p인 압축 키는 BAD_KEY', badX);
+  const badPrefix = new Uint8Array(33);
+  badPrefix[0] = 0x04;
+  let badPrefix2 = false;
+  try { Core.decompressPoint(badPrefix); } catch (e) { badPrefix2 = e.code === 'BAD_KEY'; }
+  check('0x02/0x03이 아닌 압축 키는 BAD_KEY', badPrefix2);
+}
+
+/* ------------------------------------------------------------------ */
+/* 테스트 15. v3 전 과정 시뮬레이션 (4명)                                  */
+/* ------------------------------------------------------------------ */
+section('테스트 15. v3 전 과정 시뮬레이션 (4명)');
+{
+  const room = Core.createRoom('v3 방 ✨', dateAfter(14), '1만원 이하');
+  const people = [
+    { name: '김철수', pin: '123456' },
+    { name: '홍 길동', pin: '240815' },
+    { name: '이👀수', pin: '903171' },
+    { name: '박✨하늘', pin: '555000' },
+  ];
+  const codes = [];
+  for (const person of people) {
+    codes.push((await Core.createRegistrationCode(room, person.name, person.pin)).code);
+  }
+  check('v3: 등록 코드가 MANITO3- 접두어로 생성됨', codes.every(c => c.startsWith('MANITO3-')));
+  check('v3: 페이로드가 URL 안전한 base64url만 사용',
+    codes.every(c => /^[A-Za-z0-9_-]+$/.test(c.slice('MANITO3-'.length))));
+  const parsed = Core.parseRegistrationCodes(codes.join('\n'), room.id, { rejectOldFormats: true });
+  check('v3: 4개 코드 모두 수락됨', parsed.entries.length === 4 && parsed.rejected.length === 0);
+  const url = await Core.createResultLink(room, parsed.entries);
+  check('v3: 결과 링크가 #s= 해시이고 첫 바이트 0x03',
+    url.startsWith('#s=') && Core.b64urlToBytes(url.slice(3))[0] === 0x03);
+  const pay = Core.parseResultLinkPayload(url.slice(3));
+  check('v3: 파싱 결과 방 정보·예산·이름 목록 유지',
+    pay.v === 3 && pay.g === room.g && pay.d === room.d && pay.b === '1만원 이하' &&
+    JSON.stringify(pay.names.slice().sort()) === JSON.stringify(people.map(p => p.name).sort()));
+  const revealed = new Map();
+  for (const person of people) {
+    revealed.set(person.name, await Core.openResultLink(url.slice(3), person.name, person.pin));
+  }
+  const manitos = Array.from(revealed.values());
+  check('v3: 전원이 결과 링크 하나로 각자 비밀번호로 자기 마니또 복호화',
+    manitos.every(m => pay.names.includes(m)));
+  check('v3: 자기 자신 배정 0건', people.every(p => revealed.get(p.name) !== p.name));
+  check('v3: 중복 배정 0건', new Set(manitos).size === 4);
+  check('v3: 마니또 집합이 전원 커버',
+    JSON.stringify(manitos.slice().sort()) === JSON.stringify(pay.names.slice().sort()));
+  let wrongBlocked = true;
+  try { await Core.openResultLink(url.slice(3), '김철수', '000000'); wrongBlocked = false; }
+  catch (e) { if (e.code !== 'WRONG_PIN') wrongBlocked = false; }
+  check('v3: 틀린 비밀번호는 WRONG_PIN으로 차단', wrongBlocked);
+  let otherNameBlocked = true;
+  try { await Core.openResultLink(url.slice(3), '홍 길동', '123456'); otherNameBlocked = false; }
+  catch (e) { if (e.code !== 'WRONG_PIN') otherNameBlocked = false; }
+  check('v3: 다른 사람 이름 + 내 비밀번호도 WRONG_PIN', otherNameBlocked);
+  const otherRoom = Core.createRoom('다른 v3 방', dateAfter(7), '');
+  const otherCode = (await Core.createRegistrationCode(otherRoom, '외부인', '777777')).code;
+  const mixed = Core.parseRegistrationCodes([codes[0], otherCode].join('\n'), room.id, { rejectOldFormats: true });
+  check('v3: 다른 방 코드는 OTHER_ROOM으로 제외됨',
+    mixed.entries.length === 1 && mixed.rejected.length === 1 &&
+    mixed.rejected[0].reason === 'OTHER_ROOM' && mixed.rejected[0].name === '외부인');
+  const oldV1 = (await Core.createRegistrationCode(room, '옛사람1', '111111', 1)).code;
+  const oldV2 = (await Core.createRegistrationCode(room, '옛사람2', '222222', 2)).code;
+  const withOld = Core.parseRegistrationCodes([oldV1, oldV2, codes[1]].join('\n'), room.id, { rejectOldFormats: true });
+  check('v3: 이전 형식(MANITO1-/MANITO2-) 코드는 OLD_FORMAT으로 제외',
+    withOld.entries.length === 1 && withOld.rejected.length === 2 &&
+    withOld.rejected.every(r => r.reason === 'OLD_FORMAT'));
+  const compat = Core.parseRegistrationCodes([oldV1, oldV2].join('\n'), room.id);
+  check('v3: 기본 파서는 v1/v2 코드를 그대로 수락 (core 호환 흐름 유지)',
+    compat.entries.length === 2 && compat.rejected.length === 0);
+  let oldMatchBlocked = false;
+  try { await Core.createResultLink(room, compat.entries); }
+  catch (e) { oldMatchBlocked = e.code === 'OLD_FORMAT'; }
+  check('v3: v1/v2 코드로는 결과 링크 생성 차단 (OLD_FORMAT)', oldMatchBlocked);
+  const roomParsed = Core.parseRoomPayload(Core.roomLink(room).slice(3));
+  check('v3: 방 링크는 v2 형식 유지', roomParsed.v === 2 && roomParsed.id === room.id && roomParsed.d === room.d);
+}
+
+/* ------------------------------------------------------------------ */
+/* 테스트 16. v3 전 과정 시뮬레이션 (10명)                                 */
+/* ------------------------------------------------------------------ */
+section('테스트 16. v3 전 과정 시뮬레이션 (10명)');
+{
+  const room = Core.createRoom('열 명 방', dateAfter(7), '');
+  const names = ['가', '나', '다', '라', '마', '바', '사', '아', '자', '차'];
+  const pins = {};
+  names.forEach((n, i) => { pins[n] = String(111111 + i); });
+  const codes = [];
+  for (const n of names) {
+    codes.push((await Core.createRegistrationCode(room, n, pins[n])).code);
+  }
+  const parsed = Core.parseRegistrationCodes(codes.join('\n'), room.id, { rejectOldFormats: true });
+  check('v3: 10개 코드 모두 수락됨', parsed.entries.length === 10 && parsed.rejected.length === 0);
+  const url = await Core.createResultLink(room, parsed.entries);
+  const revealed = new Map();
+  let selfOk = true;
+  for (const n of names) {
+    const m = await Core.openResultLink(url.slice(3), n, pins[n]);
+    if (m === n) selfOk = false;
+    revealed.set(n, m);
+  }
+  const manitos = Array.from(revealed.values());
+  check('v3: 10명 전원이 결과 링크 하나로 자기 마니또 확인',
+    selfOk && manitos.every(m => names.includes(m)));
+  check('v3: 10명 자기 배정·중복 배정 0건', new Set(manitos).size === 10);
+  check('v3: 10명 마니또 집합이 전원 커버',
+    JSON.stringify(manitos.slice().sort()) === JSON.stringify(names.slice().sort()));
+}
+
+/* ------------------------------------------------------------------ */
+/* 테스트 17. v3 결과 링크 파싱 방어                                     */
+/* ------------------------------------------------------------------ */
+section('테스트 17. v3 결과 링크 잘림·위조 방어');
+{
+  const room = Core.createRoom('방어 방', dateAfter(7), '');
+  const codes = [];
+  for (const n of ['가', '나', '다', '라']) {
+    codes.push((await Core.createRegistrationCode(room, n, '123456')).code);
+  }
+  const entries = Core.parseRegistrationCodes(codes.join('\n'), room.id, { rejectOldFormats: true }).entries;
+  const url = await Core.createResultLink(room, entries);
+  const hash = url.slice(3);
+  for (const cut of [1, 10]) {
+    let code = null;
+    try { Core.parseResultLinkPayload(hash.slice(0, hash.length - cut)); }
+    catch (e) { code = e.code; }
+    check(`잘린 v3 결과 링크(끝 ${cut}자)는 BAD_LINK`, code === 'BAD_LINK');
+  }
+  // 실제 페이로드를 재조립해 중복 이름·인원수 부족·깨진 암호문을 만든다
+  const pay = Core.parseResultLinkPayload(hash);
+  const days = Math.round((Date.UTC(+pay.d.slice(0, 4), +pay.d.slice(5, 7) - 1, +pay.d.slice(8, 10)) - Date.UTC(2020, 0, 1)) / 86400000);
+  const build = (names, ciphers) => {
+    const a = [0x03];
+    for (const x of Core.b64urlToBytes(pay.r)) a.push(x);
+    a.push((days >> 8) & 255, days & 255);
+    const pushStr = (s) => { const u = new TextEncoder().encode(s); a.push(u.length); for (const x of u) a.push(x); };
+    pushStr(pay.g);
+    pushStr(pay.b || '');
+    for (const x of pay.oneTimeComp) a.push(x);
+    a.push(names.length);
+    for (let i = 0; i < names.length; i++) { pushStr(names[i]); for (const x of ciphers[i]) a.push(x); }
+    return Core.bytesToB64url(new Uint8Array(a));
+  };
+  let dupCode = null;
+  try {
+    Core.parseResultLinkPayload(build(
+      [pay.names[0], pay.names[0], pay.names[1], pay.names[2]],
+      [pay.ciphers[0], pay.ciphers[1], pay.ciphers[2], pay.ciphers[3]]));
+  } catch (e) { dupCode = e.code; }
+  check('중복 이름 목록은 BAD_LINK', dupCode === 'BAD_LINK');
+  let fewCode = null;
+  try {
+    Core.parseResultLinkPayload(build([pay.names[0], pay.names[1]], [pay.ciphers[0], pay.ciphers[1]]));
+  } catch (e) { fewCode = e.code; }
+  check('인원수 2명 목록은 BAD_LINK (3~255 강제)', fewCode === 'BAD_LINK');
+  let shortCipher = null;
+  try {
+    Core.parseResultLinkPayload(build(pay.names, [pay.ciphers[0].slice(0, 8), pay.ciphers[1], pay.ciphers[2], pay.ciphers[3]]));
+  } catch (e) { shortCipher = e.code; }
+  check('암호문이 9바이트가 아니면 BAD_LINK', shortCipher === 'BAD_LINK');
+  let missingName = false;
+  try { await Core.openResultLink(hash, '없는이름', '123456'); }
+  catch (e) { missingName = e.code === 'BAD_LINK'; }
+  check('목록에 없는 이름은 BAD_LINK', missingName);
+  const r2 = Core.parseRegistrationCodes(codes[0].slice(0, -5), room.id, { rejectOldFormats: true });
+  check('잘린 v3 등록 코드는 BROKEN으로 제외',
+    r2.entries.length === 0 && r2.rejected.length === 1 && r2.rejected[0].reason === 'BROKEN');
+}
+
+/* ------------------------------------------------------------------ */
+/* 테스트 18. v3 예산 미입력 방                                          */
+/* ------------------------------------------------------------------ */
+section('테스트 18. v3 예산 미입력 방 전 과정');
+{
+  const room = Core.createRoom('예산 없는 v3 방', dateAfter(7), '');
+  const people = [
+    { name: '김철수', pin: '111111' },
+    { name: '이영희', pin: '222222' },
+    { name: '박민수', pin: '333333' },
+  ];
+  const codes = [];
+  for (const p of people) {
+    codes.push((await Core.createRegistrationCode(room, p.name, p.pin)).code);
+  }
+  const entries = Core.parseRegistrationCodes(codes.join('\n'), room.id, { rejectOldFormats: true }).entries;
+  const url = await Core.createResultLink(room, entries);
+  const pay = Core.parseResultLinkPayload(url.slice(3));
+  check('v3: 예산 미입력 방의 결과 링크에 예산 필드가 없음', !('b' in pay));
+  let ok = true;
+  for (const p of people) {
+    const m = await Core.openResultLink(url.slice(3), p.name, p.pin);
+    if (!pay.names.includes(m)) ok = false;
+  }
+  check('v3: 예산 없는 방에서도 전원 복호화 성공', ok);
+}
+
+/* ------------------------------------------------------------------ */
+/* 테스트 19. v3 링크·코드 길이                                          */
+/* ------------------------------------------------------------------ */
+section('테스트 19. v3 링크·코드 길이');
+{
+  const room = Core.createRoom('26년 왕가네 마니또', dateAfter(30), '3만원');
+  const ten = ['김철수', '이영희', '박민수', '최지우', '정하늘', '강다은', '윤서준', '한지민', '오세훈', '임수아'];
+  const codes = [];
+  for (const n of ten) {
+    codes.push((await Core.createRegistrationCode(room, n, '123456')).code);
+  }
+  const entries = Core.parseRegistrationCodes(codes.join('\n'), room.id, { rejectOldFormats: true }).entries;
+  const url10 = await Core.createResultLink(room, entries);
+  const url5 = await Core.createResultLink(room, entries.slice(0, 5));
+  const roomHash = Core.roomLink(room).slice(3);
+  console.log(`  길이 — 방 링크 해시: ${roomHash.length}자, 등록 코드: ${codes[0].length}자, 결과 링크 해시(5명): ${url5.slice(3).length}자, 결과 링크 해시(10명): ${url10.slice(3).length}자`);
+  check('v3: 등록 코드 90자 미만', codes.every(c => c.length < 90));
+  check('v3: 10명 결과 링크 해시 500자 미만', url10.slice(3).length < 500);
+  check('v3: 5명 결과 링크 해시 500자 미만', url5.slice(3).length < 500);
+}
+
+/* ------------------------------------------------------------------ */
+/* 테스트 20. 구분자 없이 이어붙인 등록 코드 분리                          */
+/* ------------------------------------------------------------------ */
+section('테스트 20. 구분자 없이 이어붙인 등록 코드 분리');
+{
+  const room = Core.createRoom('이어붙임 방', dateAfter(7), '');
+  const names = ['김철수', '이영희', '박민수'];
+  const codes = [];
+  for (const n of names) {
+    codes.push((await Core.createRegistrationCode(room, n, '123456')).code);
+  }
+  // 구분자 없이 완전히 이어붙임 — input type=text에 여러 줄 붙여넣기 시 줄바꿈이 사라지는 상황 재현
+  const glued = codes.join('');
+  const parsed = Core.parseRegistrationCodes(glued, room.id, { rejectOldFormats: true });
+  check('이어붙인 v3 코드 3개가 3명으로 인식됨',
+    parsed.entries.length === 3 && parsed.rejected.length === 0 &&
+    JSON.stringify(parsed.entries.map(e => e.n).sort()) === JSON.stringify(names.slice().sort()));
+  const parsedDefault = Core.parseRegistrationCodes(glued, room.id);
+  check('기본 파서도 이어붙인 v3 코드 3개를 인식함',
+    parsedDefault.entries.length === 3 && parsedDefault.rejected.length === 0);
+
+  // v1+v2+v3 코드가 이어붙은 경우 — 세 접두어 경계가 모두 끊어지는지
+  const gluedMixed = [
+    (await Core.createRegistrationCode(room, '옛사람1', '111111', 1)).code,
+    (await Core.createRegistrationCode(room, '옛사람2', '222222', 2)).code,
+    codes[0],
+  ].join('');
+  const parsedMixed = Core.parseRegistrationCodes(gluedMixed, room.id);
+  check('v1+v2+v3 코드가 이어붙어도 3개로 인식됨',
+    parsedMixed.entries.length === 3 && parsedMixed.rejected.length === 0);
 }
 
 /* ------------------------------------------------------------------ */
