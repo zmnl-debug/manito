@@ -88,7 +88,6 @@ input:focus, textarea:focus {
 .tab.active { background: var(--accent); border-color: var(--accent); color: #FFF; }
 h2 { font-size: 1.15rem; margin-bottom: 4px; }
 h3 { font-size: 1rem; margin-top: 16px; }
-.reject-item { color: var(--error); font-size: .8rem; margin-top: 8px; word-break: break-all; }
 .match-notice {
   margin-top: 12px; padding: 12px 14px; border-radius: 12px;
   background: var(--soft); border: 1.5px solid var(--gold);
@@ -135,6 +134,25 @@ h3 { font-size: 1rem; margin-top: 16px; }
 .reveal-label { color: var(--muted); font-size: .9rem; }
 .reveal-name { font-size: 1.7rem; font-weight: 900; color: var(--accent-dark); word-break: break-all; }
 @media (min-width: 420px) { h1 { font-size: 1.8rem; } }
+/* 방장 모드 참가자 칸 */
+.host-row { margin-top: 12px; }
+.host-row-line { display: flex; align-items: center; gap: 8px; }
+.host-row-label { flex: none; white-space: nowrap; font-size: .85rem; font-weight: 700; color: var(--muted); }
+.host-row input {
+  flex: 1; width: auto; min-width: 0; margin: 0; padding: 10px 12px; border-radius: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem;
+}
+.btn-remove {
+  flex: none; width: 34px; height: 38px; margin: 0; padding: 0; border-radius: 10px;
+  border: 1.5px solid var(--line); background: #FFF; color: var(--muted);
+  font: inherit; font-size: .95rem; line-height: 1; cursor: pointer;
+}
+.btn-remove:hover { color: var(--error); border-color: var(--error); }
+.host-row-status { margin-top: 6px; font-size: .8rem; font-weight: 600; word-break: break-all; }
+.host-row-status.ok { color: var(--accent-dark); }
+.host-row-status.bad { color: var(--error); }
+.btn-add-row { width: auto; display: inline-block; margin-top: 12px; padding: 10px 16px; font-size: .88rem; }
+@media (max-width: 374px) { .host-row-label { font-size: .78rem; } }
 </style>
 </head>
 <body>
@@ -218,18 +236,16 @@ h3 { font-size: 1rem; margin-top: 16px; }
 
     <div id="panel-host" class="card" hidden>
       <h2>방장 모드</h2>
-      <p class="hint">받은 등록 코드를 모두 붙여넣으세요. (여러 개 한 번에 가능, 줄바꿈 구분)</p>
-      <textarea id="host-codes" rows="6" placeholder="MANITO1-...
-MANITO1-..."></textarea>
+      <p class="hint">받은 등록 코드를 한 칸에 한 명씩 붙여넣어 주세요.</p>
+      <div id="host-rows"></div>
+      <button id="btn-add-participant" class="btn btn-secondary btn-add-row" type="button">+ 참가자 추가</button>
       <p id="host-error" class="error" hidden></p>
-      <button id="btn-validate" class="btn" type="button">등록 코드 확인</button>
 
-      <div id="host-check" hidden>
+      <div id="host-check">
         <h3>등록 인원 (<span id="host-count">0</span>명)</h3>
         <p id="host-names" class="name-list"></p>
-        <div id="host-rejected"></div>
         <p id="host-dup" class="error" hidden></p>
-        <button id="btn-match" class="btn" type="button">매칭하기</button>
+        <button id="btn-match" class="btn" type="button" disabled>매칭하기</button>
         <p class="hint">매칭 결과는 화면에 절대 표시되지 않아요. 아래 개인 링크를 각 참가자에게 보내 주세요.</p>
       </div>
 
@@ -309,6 +325,7 @@ MANITO1-..."></textarea>
 const PBKDF2_ITERATIONS = 600000;
 const B64URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 const CODE_PREFIX = 'MANITO1-';
+const CODE_PREFIX_V2 = 'MANITO2-';
 const HKDF_INFO = 'manito-result-v1';
 const MIN_PARTICIPANTS = 3;
 
@@ -386,6 +403,84 @@ function decodePayload(str) {
   }
 }
 
+/* ---------- v2 바이너리 페이로드 ----------
+ * v1은 JSON 안에 base64url 문자열을 넣고 그 JSON을 다시 base64url로 감싸 두 번 부풀었다.
+ * v2는 바이너리를 base64url로 한 번만 인코딩한다 (SPEC-v2-short-links.md).
+ * - 첫 바이트 0x02 = 버전. 디코딩 결과 첫 바이트가 0x7B('{')면 v1 JSON 경로.
+ * - 문자열 = [길이 1바이트][UTF-8] (길이 0 = 값 없음, 예: 예산 미입력)
+ * - 공개일 = 2020-01-01부터의 일수, uint16 big-endian
+ * - 방 ID = 6바이트 원본 (내부 표현은 v1과 같은 8글자 base64url 문자열로 통일)
+ */
+const V2_EPOCH_UTC = Date.UTC(2020, 0, 1);
+// IV 12바이트 0 고정 (링크에 담지 않음). 근거: 같은 키로 두 번 암호화하는 경로가 없다 —
+// (1) 비밀번호 키는 등록마다 새 랜덤 salt로 유도되어 딱 한 번 개인키 d를 암호화하고,
+// (2) 마니또 이름 키는 매칭마다 새 일회용 ECDH 키로 유도되어 딱 한 번 이름을 암호화한다.
+const V2_ZERO_IV = new Uint8Array(12);
+
+function binWriter() {
+  const out = [];
+  return {
+    u8: function (v) { out.push(v & 255); },
+    u16: function (v) { out.push((v >> 8) & 255, v & 255); },
+    bytes: function (arr) { for (const x of arr) out.push(x & 255); },
+    str: function (s) {
+      const u = new TextEncoder().encode(String(s));
+      if (u.length > 255) throw new ManitoError('TOO_LONG', '입력값이 너무 길어요.');
+      out.push(u.length);
+      for (const x of u) out.push(x);
+    },
+    done: function () { return new Uint8Array(out); },
+  };
+}
+
+function binReader(bytes) {
+  return {
+    b: bytes, o: 0,
+    u8: function () {
+      if (this.o >= this.b.length) throw new Error('truncated');
+      return this.b[this.o++];
+    },
+    u16: function () {
+      if (this.o + 2 > this.b.length) throw new Error('truncated');
+      const v = (this.b[this.o] << 8) | this.b[this.o + 1];
+      this.o += 2;
+      return v;
+    },
+    bytes: function (n) {
+      if (this.o + n > this.b.length) throw new Error('truncated');
+      const s = this.b.subarray(this.o, this.o + n);
+      this.o += n;
+      return s;
+    },
+    str: function () {
+      const len = this.u8();
+      return new TextDecoder().decode(this.bytes(len));
+    },
+  };
+}
+
+function dateToDays(dateStr) {
+  if (!isValidISODate(dateStr)) throw new ManitoError('BAD_ROOM', '방 정보가 올바르지 않아요.');
+  const days = Math.round(
+    (Date.UTC(+dateStr.slice(0, 4), +dateStr.slice(5, 7) - 1, +dateStr.slice(8, 10)) - V2_EPOCH_UTC) / 86400000
+  );
+  if (days < 0 || days > 65535) throw new ManitoError('BAD_ROOM', '방 정보가 올바르지 않아요.');
+  return days;
+}
+
+function daysToDate(days) {
+  const d = new Date(V2_EPOCH_UTC + days * 86400000);
+  return d.getUTCFullYear() + '-' +
+    String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getUTCDate()).padStart(2, '0');
+}
+
+function roomIdToBytes(id) {
+  const b = b64urlToBytes(id);
+  if (b.length !== 6) throw new ManitoError('BAD_ROOM', '방 정보가 올바르지 않아요.');
+  return b;
+}
+
 /* ---------- 랜덤 (crypto.getRandomValues 기반) ---------- */
 function randomBytes(n) {
   assertCrypto();
@@ -444,19 +539,50 @@ function createRoom(groupName, dateStr, budget) {
   const d = String(dateStr || '').trim();
   const b = String(budget || '').trim();
   if (!g) throw new ManitoError('NO_GROUP', '그룹 이름을 입력해 주세요.');
+  if (g.length > 30) throw new ManitoError('LONG_GROUP', '그룹 이름은 30자 이내로 입력해 주세요.');
   if (!d || !isValidISODate(d)) throw new ManitoError('NO_DATE', '공개일을 선택해 주세요.');
   if (d < todayISO()) throw new ManitoError('PAST_DATE', '공개일은 오늘 이후 날짜로 선택해 주세요.');
   if (b.length > 20) throw new ManitoError('BAD_BUDGET', '예산은 20자 이내로 입력해 주세요.');
-  const room = { v: 1, id: bytesToB64url(randomBytes(6)), g: g, d: d };
+  const room = { v: 2, id: bytesToB64url(randomBytes(6)), g: g, d: d };
   if (b) room.b = b; // 예산을 비우면 필드 자체를 넣지 않는다
   return room;
 }
 
 function roomLink(room) {
-  return '#r=' + encodePayload(room);
+  return '#r=' + (room.v === 2 ? encodeRoomV2(room) : encodePayload(room));
+}
+
+function encodeRoomV2(room) {
+  const w = binWriter();
+  w.u8(2);
+  w.bytes(roomIdToBytes(room.id));
+  w.u16(dateToDays(room.d));
+  w.str(room.g);
+  w.str(room.b || ''); // 길이 0 = 예산 없음
+  return bytesToB64url(w.done());
 }
 
 function parseRoomPayload(payloadStr) {
+  // 첫 바이트 분기: 0x02 → v2 바이너리, 그 외(0x7B '{') → v1 JSON
+  const bytes = b64urlToBytes(payloadStr);
+  if (bytes.length && bytes[0] === 0x02) {
+    try {
+      const rd = binReader(bytes);
+      rd.u8(); // 버전
+      const id = bytesToB64url(rd.bytes(6));
+      const d = daysToDate(rd.u16());
+      const g = rd.str();
+      const b = rd.str();
+      if (rd.o !== bytes.length) throw new Error('trailing bytes');
+      if (!g || !isValidISODate(d)) throw new Error('bad room');
+      const room = { v: 2, id: id, g: g, d: d };
+      if (b) room.b = b;
+      return room;
+    } catch (e) {
+      if (e && e.name === 'ManitoError') throw e;
+      throw new ManitoError('BAD_ROOM', '방 정보가 올바르지 않아요.');
+    }
+  }
   const room = decodePayload(payloadStr);
   if (!room || room.v !== 1 || typeof room.id !== 'string' || !room.id ||
       typeof room.g !== 'string' || !room.g ||
@@ -513,11 +639,12 @@ function importEcdhPublicJwk(jwk) {
   return crypto.subtle.importKey('jwk', jwk, { name: 'ECDH', namedCurve: 'P-256' }, false, []);
 }
 
-async function createRegistrationCode(room, name, pin) {
+async function createRegistrationCode(room, name, pin, version) {
   assertCrypto();
   const n = validateName(name);
   const p = validatePin(pin);
-  if (!room || room.v !== 1 || typeof room.id !== 'string' || !room.id) {
+  const v = version === 1 ? 1 : 2; // 새 코드는 항상 v2 (v1 방 링크에서 등록해도 v2)
+  if (!room || (room.v !== 1 && room.v !== 2) || typeof room.id !== 'string' || !room.id) {
     throw new ManitoError('BAD_ROOM', '방 정보가 올바르지 않아요.');
   }
   const keyPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
@@ -525,23 +652,59 @@ async function createRegistrationCode(room, name, pin) {
   delete privJwk.key_ops; // 가져올 환경마다 다른 key_ops 제약을 피하기 위해 제거
   delete privJwk.ext;
   const salt = randomBytes(16);
-  const iv = randomBytes(12);
   const pinKey = await derivePinKey(p, salt);
-  const wrapped = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: iv },
+  if (v === 1) {
+    const iv = randomBytes(12);
+    const wrapped = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: iv },
+      pinKey,
+      new TextEncoder().encode(JSON.stringify(privJwk))
+    );
+    const entry = {
+      v: 1,
+      r: room.id,
+      n: n,
+      pk: await exportPublicJwk(keyPair.publicKey),
+      ek: bytesToB64url(new Uint8Array(wrapped)),
+      s: bytesToB64url(salt),
+      i: bytesToB64url(iv),
+    };
+    return { entry: entry, code: CODE_PREFIX + encodePayload(entry) };
+  }
+  // v2: 개인키 전체 JWK 대신 d(32바이트)만 암호화 → 32 + 16(GCM 태그) = 48바이트.
+  // IV는 0으로 고정하고 링크에 담지 않는다(근거는 V2_ZERO_IV 선언 주석 참고).
+  const encD = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: V2_ZERO_IV },
     pinKey,
-    new TextEncoder().encode(JSON.stringify(privJwk))
+    b64urlToBytes(privJwk.d)
   );
-  const entry = {
-    v: 1,
-    r: room.id,
-    n: n,
-    pk: await exportPublicJwk(keyPair.publicKey),
-    ek: bytesToB64url(new Uint8Array(wrapped)),
-    s: bytesToB64url(salt),
-    i: bytesToB64url(iv),
-  };
-  return { entry: entry, code: CODE_PREFIX + encodePayload(entry) };
+  const pkRaw = new Uint8Array(await crypto.subtle.exportKey('raw', keyPair.publicKey));
+  const entry = { v: 2, r: room.id, n: n, pkRaw: pkRaw, s: salt, encD: new Uint8Array(encD) };
+  return { entry: entry, code: CODE_PREFIX_V2 + bytesToB64url(serializeEntryV2(entry)) };
+}
+
+function serializeEntryV2(entry) {
+  const w = binWriter();
+  w.u8(2);
+  w.bytes(roomIdToBytes(entry.r));
+  w.str(entry.n);
+  w.bytes(entry.pkRaw); // raw 공개키 65바이트 (0x04 · x32 · y32)
+  w.bytes(entry.s);     // salt 16바이트
+  w.bytes(entry.encD);  // 암호화된 d 48바이트
+  return w.done();
+}
+
+function parseEntryV2(bytes) {
+  const rd = binReader(bytes);
+  if (rd.u8() !== 2) throw new Error('bad version');
+  const r = bytesToB64url(rd.bytes(6));
+  const n = rd.str();
+  const pkRaw = new Uint8Array(rd.bytes(65));
+  const s = new Uint8Array(rd.bytes(16));
+  const encD = new Uint8Array(rd.bytes(48));
+  if (rd.o !== bytes.length) throw new Error('trailing bytes');
+  if (!n) throw new Error('empty name');
+  return { v: 2, r: r, n: n, pkRaw: pkRaw, s: s, encD: encD };
 }
 
 /* ---------- 매칭 (방장 브라우저) ---------- */
@@ -563,20 +726,28 @@ function parseRegistrationCodes(text, roomId) {
       continue;
     }
     seenCodes.add(token);
-    if (!token.startsWith(CODE_PREFIX)) {
+    let entry = null;
+    if (token.startsWith(CODE_PREFIX_V2)) {
+      try {
+        entry = parseEntryV2(b64urlToBytes(token.slice(CODE_PREFIX_V2.length)));
+      } catch (e) {
+        rejected.push({ snippet: snippet, reason: 'BROKEN' });
+        continue;
+      }
+    } else if (token.startsWith(CODE_PREFIX)) {
+      try {
+        entry = decodePayload(token.slice(CODE_PREFIX.length));
+      } catch (e) {
+        rejected.push({ snippet: snippet, reason: 'BROKEN' });
+        continue;
+      }
+      if (!entry || entry.v !== 1 || typeof entry.r !== 'string' ||
+          typeof entry.n !== 'string' || !entry.n || !entry.pk || !entry.ek || !entry.s || !entry.i) {
+        rejected.push({ snippet: snippet, reason: 'BROKEN' });
+        continue;
+      }
+    } else {
       rejected.push({ snippet: snippet, reason: 'FORMAT' });
-      continue;
-    }
-    let entry;
-    try {
-      entry = decodePayload(token.slice(CODE_PREFIX.length));
-    } catch (e) {
-      rejected.push({ snippet: snippet, reason: 'BROKEN' });
-      continue;
-    }
-    if (!entry || entry.v !== 1 || typeof entry.r !== 'string' ||
-        typeof entry.n !== 'string' || !entry.n || !entry.pk || !entry.ek || !entry.s || !entry.i) {
-      rejected.push({ snippet: snippet, reason: 'BROKEN' });
       continue;
     }
     if (entry.r !== roomId) {
@@ -613,9 +784,12 @@ function assignManitos(names) {
   return pairs;
 }
 
-async function deriveSharedAesKey(privateKey, peerPublicJwk) {
+async function deriveSharedAesKey(privateKey, peerPublic) {
   // ECDH 공유키 → HKDF(SHA-256) → AES-GCM 키
-  const peer = await importEcdhPublicJwk(peerPublicJwk);
+  // peerPublic: v1 JWK 객체 또는 v2 raw 공개키(Uint8Array 65바이트)
+  const peer = (peerPublic instanceof Uint8Array)
+    ? await crypto.subtle.importKey('raw', peerPublic, { name: 'ECDH', namedCurve: 'P-256' }, false, [])
+    : await importEcdhPublicJwk(peerPublic);
   const sharedBits = await crypto.subtle.deriveBits({ name: 'ECDH', public: peer }, privateKey, 256);
   const hkdfBase = await crypto.subtle.importKey('raw', sharedBits, 'HKDF', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
@@ -629,7 +803,7 @@ async function deriveSharedAesKey(privateKey, peerPublicJwk) {
 
 async function createPersonalLinks(room, entries) {
   assertCrypto();
-  if (!room || room.v !== 1 || typeof room.id !== 'string' || !room.id) {
+  if (!room || (room.v !== 1 && room.v !== 2) || typeof room.id !== 'string' || !room.id) {
     throw new ManitoError('BAD_ROOM', '방 정보가 올바르지 않아요.');
   }
   if (!entries || entries.length < MIN_PARTICIPANTS) {
@@ -642,34 +816,110 @@ async function createPersonalLinks(room, entries) {
     const entry = byName.get(pair.person);
     // 일회용 ECDH 키 쌍: 공유키를 만든 뒤 개인키와 평문 결과는 버린다
     const oneTime = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
-    const aesKey = await deriveSharedAesKey(oneTime.privateKey, entry.pk);
-    const iv = randomBytes(12);
-    const cipher = await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv: iv },
-      aesKey,
-      new TextEncoder().encode(pair.manito)
-    );
-    const payload = {
-      v: 1,
-      r: room.id,
-      g: room.g,
-      d: room.d,
-      n: entry.n,
-      ek: entry.ek,
-      s: entry.s,
-      i: entry.i,
-      ok: await exportPublicJwk(oneTime.publicKey),
-      c: bytesToB64url(new Uint8Array(cipher)),
-      w: bytesToB64url(iv),
-    };
-    if (room.b) payload.b = room.b; // 예산이 있을 때만 포함
-    links.push({ n: entry.n, manito: pair.manito, url: '#m=' + encodePayload(payload) });
+    let url;
+    if (entry.v === 2) {
+      const aesKey = await deriveSharedAesKey(oneTime.privateKey, entry.pkRaw);
+      const cipherBytes = new Uint8Array(await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: V2_ZERO_IV },
+        aesKey,
+        new TextEncoder().encode(pair.manito)
+      ));
+      // v2 개인 링크: ver · 방ID(6) · 공개일(2) · 그룹(str) · 예산(str) · 받는사람(str) ·
+      //               salt(16) · 참가자 공개키(65) · 암호화된 d(48) · 일회용 공개키(65) · 암호문길이(1) · 암호문
+      const w = binWriter();
+      w.u8(2);
+      w.bytes(roomIdToBytes(room.id));
+      w.u16(dateToDays(room.d));
+      w.str(room.g);
+      w.str(room.b || '');
+      w.str(entry.n);
+      w.bytes(entry.s);
+      w.bytes(entry.pkRaw);
+      w.bytes(entry.encD);
+      w.bytes(new Uint8Array(await crypto.subtle.exportKey('raw', oneTime.publicKey)));
+      // 암호문 길이를 명시한다 — 파싱 시 길이와 잔여 바이트를 정확히 검사해 잘린 링크를 즉시 차단
+      w.u8(cipherBytes.length);
+      w.bytes(cipherBytes);
+      url = '#m=' + bytesToB64url(w.done());
+    } else {
+      const aesKey = await deriveSharedAesKey(oneTime.privateKey, entry.pk);
+      const iv = randomBytes(12);
+      const cipher = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: iv },
+        aesKey,
+        new TextEncoder().encode(pair.manito)
+      );
+      const payload = {
+        v: 1,
+        r: room.id,
+        g: room.g,
+        d: room.d,
+        n: entry.n,
+        ek: entry.ek,
+        s: entry.s,
+        i: entry.i,
+        ok: await exportPublicJwk(oneTime.publicKey),
+        c: bytesToB64url(new Uint8Array(cipher)),
+        w: bytesToB64url(iv),
+      };
+      if (room.b) payload.b = room.b; // 예산이 있을 때만 포함
+      url = '#m=' + encodePayload(payload);
+    }
+    // 개인 링크 버전은 각 참가자 등록 코드의 버전을 따른다
+    links.push({ n: entry.n, manito: pair.manito, url: url });
   }
   return links;
 }
 
 function parsePersonalLinkPayload(payloadStr) {
-  const p = (payloadStr && typeof payloadStr === 'object') ? payloadStr : decodePayload(payloadStr);
+  if (payloadStr && typeof payloadStr === 'object') {
+    const p = payloadStr;
+    if (p.v === 2) {
+      // 내부 표준형 v2 객체 (parsePersonalLinkPayload가 만든 것을 되돌려주는 경로)
+      const required = ['v', 'r', 'g', 'd', 'n', 's', 'pkRaw', 'encD', 'okRaw', 'c'];
+      for (const k of required) {
+        if (p[k] === undefined || p[k] === null || p[k] === '') {
+          throw new ManitoError('BAD_LINK', '개인 링크가 올바르지 않아요.');
+        }
+      }
+      return p;
+    }
+    const required = ['v', 'r', 'g', 'd', 'n', 'ek', 's', 'i', 'ok', 'c', 'w'];
+    for (const k of required) {
+      if (!p || p[k] === undefined || p[k] === null || p[k] === '') {
+        throw new ManitoError('BAD_LINK', '개인 링크가 올바르지 않아요.');
+      }
+    }
+    if (p.v !== 1) throw new ManitoError('BAD_LINK', '개인 링크가 올바르지 않아요.');
+    return p;
+  }
+  // 첫 바이트 분기: 0x02 → v2 바이너리, 그 외(0x7B '{') → v1 JSON
+  const bytes = b64urlToBytes(payloadStr);
+  if (bytes.length && bytes[0] === 0x02) {
+    try {
+      const rd = binReader(bytes);
+      rd.u8(); // 버전
+      const r = bytesToB64url(rd.bytes(6));
+      const d = daysToDate(rd.u16());
+      const g = rd.str();
+      const b = rd.str();
+      const n = rd.str();
+      const s = new Uint8Array(rd.bytes(16));
+      const pkRaw = new Uint8Array(rd.bytes(65));
+      const encD = new Uint8Array(rd.bytes(48));
+      const okRaw = new Uint8Array(rd.bytes(65));
+      const c = new Uint8Array(rd.bytes(rd.u8())); // 마니또 이름 암호문([길이 1바이트][암호문])
+      if (rd.o !== bytes.length) throw new Error('trailing bytes'); // 잘린 링크는 여기서 차단
+      if (!g || !n || !isValidISODate(d) || c.length < 16) throw new Error('bad link');
+      const p = { v: 2, r: r, g: g, d: d, n: n, s: s, pkRaw: pkRaw, encD: encD, okRaw: okRaw, c: c };
+      if (b) p.b = b;
+      return p;
+    } catch (e) {
+      if (e && e.name === 'ManitoError') throw e;
+      throw new ManitoError('BAD_LINK', '개인 링크가 올바르지 않아요.');
+    }
+  }
+  const p = decodePayload(payloadStr);
   const required = ['v', 'r', 'g', 'd', 'n', 'ek', 's', 'i', 'ok', 'c', 'w'];
   for (const k of required) {
     if (!p || p[k] === undefined || p[k] === null || p[k] === '') {
@@ -687,6 +937,43 @@ async function openPersonalLink(payload, pin) {
   const pinNum = String(pin || '');
   if (!/^\d{6,}$/.test(pinNum)) throw new ManitoError('WRONG_PIN', '비밀번호가 맞지 않아요.');
   let privateKey;
+  if (p.v === 2) {
+    let dBytes;
+    try {
+      const pinKey = await derivePinKey(pinNum, p.s);
+      // IV는 0 고정 — 비밀번호 키는 등록마다 새 salt로 딱 한 번만 쓰인다(V2_ZERO_IV 주석 참고)
+      dBytes = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: V2_ZERO_IV }, pinKey, p.encD));
+    } catch (e) {
+      // 비밀번호가 틀리면 개인키 복호화(AES-GCM 인증)가 실패한다
+      throw new ManitoError('WRONG_PIN', '비밀번호가 맞지 않아요.');
+    }
+    if (dBytes.length !== 32 || p.pkRaw.length !== 65 || p.pkRaw[0] !== 0x04) {
+      throw new ManitoError('BAD_LINK', '개인 링크가 올바르지 않아요.');
+    }
+    // 암호화됐던 것은 JWK의 d(32바이트)뿐 — x, y는 링크의 참가자 공개키(raw 65바이트)에서 꺼낸다
+    const privJwk = {
+      kty: 'EC', crv: 'P-256',
+      x: bytesToB64url(p.pkRaw.subarray(1, 33)),
+      y: bytesToB64url(p.pkRaw.subarray(33, 65)),
+      d: bytesToB64url(new Uint8Array(dBytes)),
+    };
+    const privateKey2 = await crypto.subtle.importKey(
+      'jwk', privJwk, { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']
+    );
+    const aesKey = await deriveSharedAesKey(privateKey2, p.okRaw);
+    let plain;
+    try {
+      plain = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: V2_ZERO_IV },
+        aesKey,
+        p.c
+      );
+    } catch (e) {
+      // 개인키 복호화는 통과했는데 이름 복호화가 실패했다 = 링크가 잘렸거나 손상됐다
+      throw new ManitoError('BAD_LINK', '개인 링크가 올바르지 않아요.');
+    }
+    return new TextDecoder().decode(plain);
+  }
   try {
     // PIN → PBKDF2 → 개인키 복호화
     const pinKey = await derivePinKey(pinNum, b64urlToBytes(p.s));
@@ -822,12 +1109,12 @@ if (typeof document !== 'undefined' && document.getElementById('screen-home')) {
     $('room-sub').textContent = '마니또 공개일: ' + room.d + (room.b ? ' · 선물 예산: ' + room.b : '');
     $('form-join').hidden = false;
     $('join-result').hidden = true;
-    $('host-check').hidden = true;
+    $('host-check').hidden = false;
     $('host-links').hidden = true;
     $('btn-match').hidden = false;
     $('match-notice').hidden = true;
     $('btn-rematch').hidden = true;
-    $('host-codes').value = '';
+    resetHostRows();
     switchTab('join');
   }
 
@@ -913,39 +1200,147 @@ if (typeof document !== 'undefined' && document.getElementById('screen-home')) {
   $('tab-join').addEventListener('click', function () { switchTab('join'); });
   $('tab-host').addEventListener('click', function () { switchTab('host'); });
 
-  /* ----- 방장 모드 ----- */
-  $('btn-validate').addEventListener('click', function () {
+  /* ----- 방장 모드: 칸 단위 등록 코드 입력 ----- */
+  function hostRowInput(row) { return row.querySelector('input'); }
+
+  function setRowStatus(row, text, kind) {
+    const st = row.querySelector('.host-row-status');
+    st.textContent = text;
+    st.className = 'host-row-status' + (kind ? ' ' + kind : '');
+  }
+
+  function renumberRows() {
+    const rows = $('host-rows').children;
+    for (let i = 0; i < rows.length; i++) {
+      rows[i].querySelector('.host-row-label').textContent = '참가자 ' + (i + 1);
+    }
+  }
+
+  function addHostRow(value, focus, refNode) {
+    const row = document.createElement('div');
+    row.className = 'host-row';
+    const line = document.createElement('div');
+    line.className = 'host-row-line';
+    const lbl = document.createElement('span');
+    lbl.className = 'host-row-label';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'MANITO2-...';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'btn-remove';
+    del.setAttribute('aria-label', '참가자 칸 삭제');
+    del.textContent = '✕';
+    del.addEventListener('click', function () {
+      if ($('host-rows').children.length === 1) {
+        // 칸이 하나뿐이면 삭제 대신 내용만 비운다
+        input.value = '';
+        onRowChange(row);
+        input.focus();
+        return;
+      }
+      row.remove();
+      renumberRows();
+      onRowChange(null);
+    });
+    input.addEventListener('input', function () { onRowChange(row); });
+    line.appendChild(lbl);
+    line.appendChild(input);
+    line.appendChild(del);
+    row.appendChild(line);
+    const st = document.createElement('p');
+    st.className = 'host-row-status';
+    row.appendChild(st);
+    if (refNode) $('host-rows').insertBefore(row, refNode);
+    else $('host-rows').appendChild(row);
+    if (value) input.value = value;
+    renumberRows();
+    if (focus) input.focus();
+    return row;
+  }
+
+  function resetHostRows() {
+    $('host-rows').innerHTML = '';
+    addHostRow('', false);
+    refreshHostCheck();
+  }
+
+  function tokensOf(value) {
+    return String(value || '').split(/[\s,;]+/).filter(Boolean);
+  }
+
+  function autoSplitRow(row) {
+    const input = hostRowInput(row);
+    const tokens = tokensOf(input.value);
+    if (tokens.length < 2) return;
+    // 여러 코드가 한 칸에 붙여넣어지면 자동으로 칸을 나눠 채운다
+    input.value = tokens[0];
+    let ref = row.nextSibling;
+    for (let i = 1; i < tokens.length; i++) {
+      const newRow = addHostRow(tokens[i], false, ref);
+      ref = newRow.nextSibling;
+    }
+  }
+
+  function refreshHostCheck() {
     showError('host-error', null);
-    // 다시 검증하면 이전 매칭 결과(링크)는 모두 숨긴다
+    const roomId = state.room ? state.room.id : null;
+    const entries = [];
+    const seenCodes = new Set();
+    for (const row of Array.from($('host-rows').children)) {
+      const tokens = tokensOf(hostRowInput(row).value);
+      if (!tokens.length) { setRowStatus(row, '', null); continue; }
+      const token = tokens[0]; // 칸 하나에 코드 한 개 (여러 개는 자동 분할됨)
+      if (seenCodes.has(token)) {
+        setRowStatus(row, REJECT_LABEL.DUPLICATE_CODE, 'bad');
+        continue;
+      }
+      seenCodes.add(token);
+      // 기존 파서를 칸별로 재사용해 판정한다
+      const per = parseRegistrationCodes(token, roomId);
+      if (per.rejected.length) {
+        const r = per.rejected[0];
+        setRowStatus(row,
+          r.reason === 'OTHER_ROOM' && r.name
+            ? '다른 방의 코드예요 (' + r.name + '님 코드)'
+            : REJECT_LABEL[r.reason],
+          'bad');
+        continue;
+      }
+      entries.push(per.entries[0]);
+      setRowStatus(row, '✓ ' + per.entries[0].n, 'ok');
+    }
+    const nameCount = new Map();
+    for (const e of entries) nameCount.set(e.n, (nameCount.get(e.n) || 0) + 1);
+    const duplicates = [];
+    for (const pair of nameCount) if (pair[1] > 1) duplicates.push(pair[0]);
+    state.check = { entries: entries, rejected: [], duplicates: duplicates };
+    $('host-count').textContent = String(entries.length);
+    $('host-names').textContent = entries.length
+      ? entries.map(function (e) { return e.n; }).join(', ')
+      : '확인된 등록 코드가 없어요.';
+    if (duplicates.length) {
+      showError('host-dup', '같은 이름이 두 번 이상 등록되었어요: ' + duplicates.join(', '));
+    } else {
+      showError('host-dup', null);
+    }
+    $('btn-match').disabled = entries.length < MIN_PARTICIPANTS || duplicates.length > 0;
+  }
+
+  function onRowChange(row) {
+    if (row) autoSplitRow(row);
+    // 등록 코드를 고치면 이전 매칭 결과(링크)는 모두 숨긴다
     $('host-links').hidden = true;
     $('match-notice').hidden = true;
     $('btn-rematch').hidden = true;
     $('btn-match').hidden = false;
-    const roomId = state.room ? state.room.id : null;
-    const check = parseRegistrationCodes($('host-codes').value, roomId);
-    state.check = check;
-    $('host-count').textContent = String(check.entries.length);
-    $('host-names').textContent = check.entries.length
-      ? check.entries.map(function (e) { return e.n; }).join(', ')
-      : '확인된 등록 코드가 없어요.';
-    const rejBox = $('host-rejected');
-    rejBox.innerHTML = '';
-    for (const r of check.rejected) {
-      const p = document.createElement('p');
-      p.className = 'reject-item';
-      p.textContent = '제외됨 · ' + REJECT_LABEL[r.reason] +
-        (r.reason === 'OTHER_ROOM' && r.name ? ' (' + r.name + '님 코드)' : '') +
-        ' — ' + r.snippet;
-      rejBox.appendChild(p);
-    }
-    rejBox.hidden = check.rejected.length === 0;
-    if (check.duplicates.length) {
-      showError('host-dup', '같은 이름이 두 번 이상 등록되었어요: ' + check.duplicates.join(', '));
-    } else {
-      showError('host-dup', null);
-    }
-    $('btn-match').disabled = check.entries.length < MIN_PARTICIPANTS || check.duplicates.length > 0;
-    $('host-check').hidden = false;
+    refreshHostCheck();
+  }
+
+  $('btn-add-participant').addEventListener('click', function () {
+    onRowChange(addHostRow('', true));
   });
 
   function renderMatchLinks(links) {
@@ -1000,11 +1395,6 @@ if (typeof document !== 'undefined' && document.getElementById('screen-home')) {
       '매칭이 끝났어요. 이 링크들만 보내 주세요. 다시 매칭하면 이전 링크는 모두 버리고 새 링크를 전원에게 다시 보내야 해요.'
     );
     if (confirmed) runMatching();
-  });
-
-  $('host-codes').addEventListener('input', function () {
-    // 등록 코드 입력란을 수정하면 이전 링크 목록은 숨긴다
-    $('host-links').hidden = true;
   });
 
   /* ----- 결과 확인 ----- */
